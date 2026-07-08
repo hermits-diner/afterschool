@@ -216,8 +216,8 @@ router.post('/users', ah(async (req, res) => {
   res.status(201).json({ user: publicUser(user) });
 }));
 
-// Bulk-register students: 학번(학년/반/번호) + 이름 + 임시비밀번호.
-// username = 활성 세션 연도 + 학번 (예: 2026년 1학년 2반 3번 → '202610203').
+// Bulk-register students: 학번 4자리(학년1+반1+번호2) + 이름 + 임시비밀번호.
+// username = 활성 세션 연도 + 학번 (예: 2026년 1학년 1반 1번 → '20261101').
 // 첫 로그인 시 비밀번호 변경 강제.
 router.post('/users/bulk', ah(async (req, res) => {
   const schema = z.object({
@@ -225,7 +225,7 @@ router.post('/users/bulk', ah(async (req, res) => {
       .array(
         z.object({
           grade: z.number().int().min(1).max(3),
-          class_no: z.number().int().min(1).max(99),
+          class_no: z.number().int().min(1).max(9),
           student_no: z.number().int().min(1).max(99),
           name: z.string().min(1),
           password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.'),
@@ -245,7 +245,8 @@ router.post('/users/bulk', ah(async (req, res) => {
   const created = [];
   const skipped = [];
   for (const s of parsed.data.students) {
-    const username = `${year}${s.grade}${pad2(s.class_no)}${pad2(s.student_no)}`;
+    // 학번 4자리: 학년(1) + 반(1) + 번호(2)
+    const username = `${year}${s.grade}${s.class_no}${pad2(s.student_no)}`;
     const dupe = await get('SELECT id FROM users WHERE username = ?', [username]);
     if (dupe) {
       skipped.push({ username, name: s.name, reason: '이미 존재하는 아이디' });

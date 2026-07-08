@@ -19,11 +19,11 @@ interface BulkRow {
   password: string;
 }
 
-// '10203' 또는 '1-2-3' 형식의 학번을 파싱한다.
+// 4자리 학번 '1101'(학년1+반1+번호2) 또는 '1-1-1' 형식을 파싱한다.
 function parseStudentId(token: string): { grade: number; class_no: number; student_no: number } | null {
-  let m = token.match(/^([1-3])(\d{2})(\d{2})$/);
+  let m = token.match(/^([1-3])(\d)(\d{2})$/);
   if (m) return { grade: Number(m[1]), class_no: Number(m[2]), student_no: Number(m[3]) };
-  m = token.match(/^([1-3])-(\d{1,2})-(\d{1,2})$/);
+  m = token.match(/^([1-3])-(\d)-(\d{1,2})$/);
   if (m) return { grade: Number(m[1]), class_no: Number(m[2]), student_no: Number(m[3]) };
   return null;
 }
@@ -99,7 +99,7 @@ export default function AdminUsers() {
         }
         const sid = parseStudentId(parts[0]);
         if (!sid) {
-          errors.push(`${i + 1}행: 학번 형식 오류 — "${parts[0]}" (예: 10203 또는 1-2-3)`);
+          errors.push(`${i + 1}행: 학번 형식 오류 — "${parts[0]}" (4자리, 예: 1101 또는 1-1-1)`);
           return;
         }
         const name = parts[1];
@@ -327,7 +327,7 @@ export default function AdminUsers() {
               </div>
             )}
             <p className="mb-4 text-sm text-slate-500">
-              등록된 학생은 <b>아이디 = 연도+학번</b>(예: 202610101), 입력한 임시비밀번호로 로그인하며,
+              등록된 학생은 <b>아이디 = 연도+학번</b>(예: 20261101), 입력한 임시비밀번호로 로그인하며,
               첫 로그인 시 비밀번호 변경이 필요합니다.
             </p>
             <div className="flex justify-end gap-2">
@@ -338,16 +338,16 @@ export default function AdminUsers() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 명씩 <b>학번 이름 [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
-              <br />아이디는 <b>연도+학번</b>으로 자동 설정됩니다 (예: 1학년 1반 1번 → <b>202610101</b>).
+              한 줄에 한 명씩 <b>학번(4자리) 이름 [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
+              <br />학번 = 학년(1)+반(1)+번호(2). 아이디는 <b>연도+학번</b>으로 자동 설정됩니다 (예: 1학년 1반 1번 → <b>20261101</b>).
               <div className="mt-1 font-mono text-xs text-slate-500">
-                10101 김민준 pass1234<br />
+                1101 김민준 pass1234<br />
                 1-1-2 이서연 <span className="text-slate-400">← 비밀번호 생략 시 아래 공통 임시비밀번호 적용</span>
               </div>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'10101 김민준 pass1234\n10102 이서연\n10103 박도윤'}
+              placeholder={'1101 김민준 pass1234\n1102 이서연\n1103 박도윤'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
