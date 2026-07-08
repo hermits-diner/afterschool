@@ -1,8 +1,25 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import db from '../db.js';
+import db, { getSetting } from '../db.js';
 import { authRequired, requireRole } from '../auth.js';
 import { decorateCourse } from '../logic.js';
+
+const DAY_INDEX = { 일: 0, 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6 };
+
+// Generate `count` weekly session dates on `dayKor`, starting on/after `anchor` (YYYY-MM-DD).
+function sessionDates(dayKor, anchor, count = 16) {
+  const target = DAY_INDEX[dayKor] ?? 1;
+  const base = anchor ? new Date(anchor + 'T00:00:00') : new Date();
+  // advance to first matching weekday
+  const d = new Date(base);
+  while (d.getDay() !== target) d.setDate(d.getDate() + 1);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 7);
+  }
+  return out;
+}
 
 const router = Router();
 router.use(authRequired, requireRole('teacher'));
@@ -125,6 +142,38 @@ router.get('/courses/:id/attendance-summary', ownedCourse, (req, res) => {
     )
     .all(req.course.id);
   res.json({ course: decorateCourse(req.course), summary: rows });
+});
+
+// Printable attendance book: enrolled students × session dates matrix with recorded statuses.
+router.get('/courses/:id/attendance-book', ownedCourse, (req, res) => {
+  const count = Math.min(Math.max(Number(req.query.count) || 16, 1), 30);
+  const anchor = req.query.start || getSetting('registration_end') || getSetting('registration_start');
+  const dates = sessionDates(req.course.day_of_week, anchor, count);
+
+  const students = db
+    .prepare(
+      `SELECT u.id AS student_id, u.name, u.grade, u.class_no, u.student_no
+       FROM enrollments e JOIN users u ON u.id=e.student_id
+       WHERE e.course_id = ? AND e.status='enrolled'
+       ORDER BY u.grade, u.class_no, u.student_no`
+    )
+    .all(req.course.id);
+
+  const marks = db
+    .prepare(
+      `SELECT student_id, date, status FROM attendance WHERE course_id = ? AND date IN (${dates
+        .map(() => '?')
+        .join(',')})`
+    )
+    .all(req.course.id, ...dates);
+
+  const records = {};
+  for (const m of marks) {
+    (records[m.student_id] ||= {})[m.date] = m.status;
+  }
+
+  const teacher = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
+  res.json({ course: decorateCourse(req.course), teacher_name: teacher?.name || '', dates, students, records });
 });
 
 /* ---------------- Announcements ---------------- */

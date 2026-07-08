@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../lib/api';
 import { ApiError } from '../lib/api';
+import { Check, GraduationCap } from 'lucide-react';
 
 const ROLES: { key: Role; label: string; desc: string; emoji: string }[] = [
   { key: 'student', label: '학생', desc: '강좌 조회 및 수강신청', emoji: '🎒' },
@@ -52,7 +53,9 @@ export default function Login() {
         <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10" />
         <div className="absolute -bottom-24 -left-16 h-80 w-80 rounded-full bg-white/5" />
         <div className="relative max-w-md">
-          <div className="mb-6 text-5xl">🎓</div>
+          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+            <GraduationCap size={30} />
+          </div>
           <h1 className="text-3xl font-bold leading-tight">방과후학교 온라인 수강신청 시스템</h1>
           <p className="mt-4 text-brand-100">
             선착순 수강신청, 실시간 정원 확인, 시간표 관리, 출석 체크까지.
@@ -71,7 +74,9 @@ export default function Login() {
       <div className="flex flex-1 items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-sm">
           <div className="mb-6 text-center lg:hidden">
-            <div className="text-4xl">🎓</div>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white">
+              <GraduationCap size={26} />
+            </div>
             <h1 className="mt-2 text-xl font-bold text-slate-900">방과후학교 수강신청</h1>
           </div>
 
@@ -155,5 +160,9 @@ export default function Login() {
 }
 
 function Dot() {
-  return <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs">✓</span>;
+  return (
+    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20">
+      <Check size={12} />
+    </span>
+  );
 }

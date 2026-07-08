@@ -4,6 +4,7 @@ import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../co
 import { CATEGORIES, DAYS, targetGradeLabel, formatFee, courseStatusLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { Icons } from '../../components/icons';
 
 export default function StudentCatalog() {
   const toast = useToast();
@@ -110,10 +111,10 @@ export default function StudentCatalog() {
                 </div>
                 <h3 className="mb-1 font-bold text-slate-900">{c.title}</h3>
                 <p className="mb-3 line-clamp-2 flex-1 text-sm text-slate-500">{c.description || '강좌 소개가 없습니다.'}</p>
-                <div className="mb-3 space-y-1 text-sm text-slate-600">
-                  <div className="flex items-center gap-1.5">🕒 {c.day_of_week} {c.start_time}~{c.end_time}</div>
-                  <div className="flex items-center gap-1.5">📍 {c.room || '미정'} · {c.teacher_name}</div>
-                  <div className="flex items-center gap-1.5">💰 {formatFee(c.fee)}</div>
+                <div className="mb-3 space-y-1.5 text-sm text-slate-600">
+                  <div className="flex items-center gap-2"><Icons.clock size={15} className="text-slate-400" /> {c.day_of_week} {c.start_time}~{c.end_time}</div>
+                  <div className="flex items-center gap-2"><Icons.pin size={15} className="text-slate-400" /> {c.room || '미정'} · {c.teacher_name}</div>
+                  <div className="flex items-center gap-2"><Icons.wallet size={15} className="text-slate-400" /> {formatFee(c.fee)}</div>
                 </div>
                 <div className="mb-3">
                   <div className="mb-1 flex justify-between text-xs">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Icons } from '../../components/icons';
 
 export default function TeacherRoster() {
   const location = useLocation() as any;
@@ -65,7 +66,13 @@ export default function TeacherRoster() {
                   </div>
                   <span className="text-slate-500">{course.day_of_week} {course.start_time}~{course.end_time}</span>
                   <span className="text-slate-500">{course.room}</span>
-                  <span className="ml-auto font-semibold text-slate-700">수강 {enrolled.length}명 · 대기 {waitlisted.length}명</span>
+                  <span className="font-semibold text-slate-700">수강 {enrolled.length}명 · 대기 {waitlisted.length}명</span>
+                  <button
+                    className="btn-secondary btn-sm ml-auto"
+                    onClick={() => window.open(`/teacher/print/roster/${course.id}`, '_blank')}
+                  >
+                    <Icons.printer size={14} /> 명렬표 인쇄
+                  </button>
                 </div>
               )}
 

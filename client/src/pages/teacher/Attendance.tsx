@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState } from '../../components/ui';
+import { Icons } from '../../components/icons';
 import { useToast } from '../../context/ToastContext';
 
 type Status = 'present' | 'absent' | 'late' | 'excused';
@@ -91,6 +92,14 @@ export default function TeacherAttendance() {
           <button onClick={() => { setTab('summary'); loadSummary(); }} className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === 'summary' ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500'}`}>출결 통계</button>
         </div>
         {tab === 'mark' && <input type="date" className="input w-40" value={date} onChange={(e) => setDate(e.target.value)} />}
+        {selected && (
+          <button
+            className="btn-secondary ml-auto"
+            onClick={() => window.open(`/teacher/print/attendance/${selected}`, '_blank')}
+          >
+            <Icons.printer size={16} /> 출석부 인쇄
+          </button>
+        )}
       </div>
 
       {tab === 'mark' ? (

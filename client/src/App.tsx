@@ -18,6 +18,8 @@ import TeacherDashboard from './pages/teacher/Dashboard';
 import TeacherCourses from './pages/teacher/Courses';
 import TeacherRoster from './pages/teacher/Roster';
 import TeacherAttendance from './pages/teacher/Attendance';
+import PrintRoster from './pages/teacher/PrintRoster';
+import PrintAttendance from './pages/teacher/PrintAttendance';
 
 import StudentDashboard from './pages/student/Dashboard';
 import StudentCatalog from './pages/student/Catalog';
@@ -87,6 +89,9 @@ export default function App() {
 
       {/* Teacher */}
       <Route element={<RequireRole role="teacher" />}>
+        {/* Standalone print views (no sidebar) */}
+        <Route path="/teacher/print/roster/:id" element={<PrintRoster />} />
+        <Route path="/teacher/print/attendance/:id" element={<PrintAttendance />} />
         <Route element={<RoleLayout nav={teacherNav} />}>
           <Route path="/teacher" element={<TeacherDashboard />} />
           <Route path="/teacher/courses" element={<TeacherCourses />} />
