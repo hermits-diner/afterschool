@@ -13,6 +13,7 @@ import AdminCourses from './pages/admin/Courses';
 import AdminUsers from './pages/admin/Users';
 import AdminEnrollments from './pages/admin/Enrollments';
 import AdminSettings from './pages/admin/Settings';
+import AdminPrintEnrollments from './pages/admin/PrintEnrollments';
 
 import TeacherDashboard from './pages/teacher/Dashboard';
 import TeacherCourses from './pages/teacher/Courses';
@@ -25,6 +26,7 @@ import StudentDashboard from './pages/student/Dashboard';
 import StudentCatalog from './pages/student/Catalog';
 import StudentMyCourses from './pages/student/MyCourses';
 import StudentTimetable from './pages/student/Timetable';
+import StudentPrintTimetable from './pages/student/PrintTimetable';
 
 function RequireRole({ role }: { role: Role }) {
   const { user, loading } = useAuth();
@@ -77,6 +79,8 @@ export default function App() {
 
       {/* Admin */}
       <Route element={<RequireRole role="admin" />}>
+        {/* Standalone print view (no sidebar) */}
+        <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
         <Route element={<RoleLayout nav={adminNav} />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/courses" element={<AdminCourses />} />
@@ -103,6 +107,8 @@ export default function App() {
 
       {/* Student */}
       <Route element={<RequireRole role="student" />}>
+        {/* Standalone print view (no sidebar) */}
+        <Route path="/student/print/timetable" element={<StudentPrintTimetable />} />
         <Route element={<RoleLayout nav={studentNav} />}>
           <Route path="/student" element={<StudentDashboard />} />
           <Route path="/student/catalog" element={<StudentCatalog />} />

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Icons } from '../../components/icons';
 import Timetable from '../../components/Timetable';
 
 const DAYS = ['월', '화', '수', '목', '금'];
@@ -17,8 +18,17 @@ export default function StudentTimetable() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold text-slate-900">내 시간표</h1>
-      <p className="mb-6 text-sm text-slate-500">수강 확정된 강좌의 주간 시간표입니다.</p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold text-slate-900">내 시간표</h1>
+          <p className="text-sm text-slate-500">수강 확정된 강좌의 주간 시간표입니다.</p>
+        </div>
+        {enrolled.length > 0 && (
+          <button className="btn-secondary" onClick={() => window.open('/student/print/timetable', '_blank')}>
+            <Icons.printer size={16} /> 시간표 인쇄
+          </button>
+        )}
+      </div>
 
       {enrolled.length === 0 ? (
         <EmptyState message="수강 확정된 강좌가 없습니다." sub="대기 중인 강좌는 시간표에 표시되지 않습니다." />

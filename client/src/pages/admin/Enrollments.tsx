@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Icons } from '../../components/icons';
 import { enrollStatusLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
@@ -77,7 +78,14 @@ export default function AdminEnrollments() {
           <h1 className="text-2xl font-bold text-slate-900">수강신청 현황</h1>
           <p className="text-sm text-slate-500">전체 수강신청 내역을 조회하고 관리합니다.</p>
         </div>
-        <button className="btn-secondary" onClick={exportCsv}>엑셀(CSV) 다운로드</button>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={() => window.open('/admin/print/enrollments', '_blank')}>
+            <Icons.printer size={16} /> 인쇄
+          </button>
+          <button className="btn-secondary" onClick={exportCsv}>
+            <Icons.download size={16} /> 엑셀(CSV)
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
