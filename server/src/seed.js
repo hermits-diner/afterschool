@@ -1,0 +1,120 @@
+import db, { initSchema, getSetting } from './db.js';
+import { hashPassword } from './auth.js';
+
+const SURNAMES = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '류', '홍'];
+const GIVEN = ['민준', '서연', '도윤', '지우', '예준', '서윤', '주원', '하윤', '지호', '지유', '준우', '수아', '건우', '지아', '현우', '하은', '우진', '유나', '민재', '채원', '지훈', '다은', '선우', '수빈', '연우'];
+
+function pick(arr, i) {
+  return arr[i % arr.length];
+}
+
+export function ensureSeed() {
+  initSchema();
+  const existing = db.prepare('SELECT COUNT(*) c FROM users').get().c;
+  if (existing > 0) return; // already seeded
+
+  console.log('  🌱  데모 데이터를 생성합니다...');
+  const semester = getSetting('semester');
+
+  const insertUser = db.prepare(
+    `INSERT INTO users (username, password_hash, role, name, email, phone, grade, class_no, student_no, subject_area)
+     VALUES (@username,@hash,@role,@name,@email,@phone,@grade,@class_no,@student_no,@subject_area)`
+  );
+
+  // Admin
+  insertUser.run({
+    username: 'admin', hash: hashPassword('admin123'), role: 'admin', name: '방과후 담당자',
+    email: 'admin@school.hs.kr', phone: '02-000-0000', grade: null, class_no: null, student_no: null, subject_area: null,
+  });
+
+  // Teachers
+  const teacherDefs = [
+    { username: 'teacher1', name: '김국어', subject_area: '국어' },
+    { username: 'teacher2', name: '이영어', subject_area: '영어' },
+    { username: 'teacher3', name: '박수학', subject_area: '수학' },
+    { username: 'teacher4', name: '최과학', subject_area: '과학' },
+    { username: 'teacher5', name: '정체육', subject_area: '예체능' },
+  ];
+  const teacherIds = {};
+  for (const t of teacherDefs) {
+    const info = insertUser.run({
+      username: t.username, hash: hashPassword('teacher123'), role: 'teacher', name: t.name,
+      email: `${t.username}@school.hs.kr`, phone: '010-0000-0000',
+      grade: null, class_no: null, student_no: null, subject_area: t.subject_area,
+    });
+    teacherIds[t.username] = info.lastInsertRowid;
+  }
+
+  // Students: 30 students across grades 1-3
+  const studentIds = [];
+  for (let i = 0; i < 30; i++) {
+    const grade = (i % 3) + 1;
+    const classNo = (i % 4) + 1;
+    const name = pick(SURNAMES, i) + pick(GIVEN, i);
+    const num = String(i + 1).padStart(2, '0');
+    const info = insertUser.run({
+      username: `student${num}`, hash: hashPassword('student123'), role: 'student', name,
+      email: null, phone: `010-1234-${num.padStart(4, '0')}`,
+      grade, class_no: classNo, student_no: (i % 25) + 1, subject_area: null,
+    });
+    studentIds.push(info.lastInsertRowid);
+  }
+  // Give the first student a friendly demo id
+  db.prepare("UPDATE users SET username='student', name='홍길동' WHERE id=?").run(studentIds[0]);
+
+  // Courses
+  const insertCourse = db.prepare(
+    `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, semester, status)
+     VALUES (@title,@category,@description,@teacher_id,@capacity,@day_of_week,@start_time,@end_time,@room,@target_grade,@fee,@semester,'open')`
+  );
+  const courseDefs = [
+    { title: '수능 국어 독서 완성', category: '국어', teacher: 'teacher1', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '201호', target_grade: 3, fee: 0, description: '비문학 지문 분석과 독해력 향상을 위한 심화 과정입니다.' },
+    { title: '문학 감상과 서술형 대비', category: '국어', teacher: 'teacher1', capacity: 15, day_of_week: '수', start_time: '16:00', end_time: '17:30', room: '201호', target_grade: 2, fee: 0, description: '현대·고전 문학 작품을 감상하고 서술형 평가를 대비합니다.' },
+    { title: '실전 영어 독해 (수능 대비)', category: '영어', teacher: 'teacher2', capacity: 20, day_of_week: '화', start_time: '16:00', end_time: '17:30', room: '202호', target_grade: 3, fee: 0, description: '고난도 영어 지문 독해 전략과 어법을 다룹니다.' },
+    { title: '영어 회화 & 발표', category: '영어', teacher: 'teacher2', capacity: 12, day_of_week: '목', start_time: '16:00', end_time: '17:00', room: '어학실', target_grade: 0, fee: 0, description: '원어민 스타일 회화 연습과 영어 발표 훈련.' },
+    { title: '미적분 심화 문제풀이', category: '수학', teacher: 'teacher3', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '203호', target_grade: 2, fee: 0, description: '미적분 핵심 개념과 킬러 문항 풀이 전략.' },
+    { title: '수학 기초 개념 다지기', category: '수학', teacher: 'teacher3', capacity: 25, day_of_week: '금', start_time: '16:00', end_time: '17:30', room: '203호', target_grade: 1, fee: 0, description: '고1 수학 기초 개념을 탄탄하게 다지는 강좌.' },
+    { title: '물리 실험 탐구', category: '과학', teacher: 'teacher4', capacity: 16, day_of_week: '화', start_time: '16:00', end_time: '18:00', room: '물리실', target_grade: 0, fee: 5000, description: '직접 실험하며 배우는 물리 개념. 재료비 포함.' },
+    { title: '화학 II 심화', category: '과학', teacher: 'teacher4', capacity: 18, day_of_week: '목', start_time: '16:00', end_time: '17:30', room: '화학실', target_grade: 3, fee: 3000, description: '화학 반응과 평형을 심화 학습합니다.' },
+    { title: '농구 교실', category: '예체능', teacher: 'teacher5', capacity: 20, day_of_week: '수', start_time: '16:30', end_time: '18:00', room: '체육관', target_grade: 0, fee: 0, description: '기초 드리블부터 팀 경기까지. 운동복 지참.' },
+    { title: '방송 댄스', category: '예체능', teacher: 'teacher5', capacity: 15, day_of_week: '금', start_time: '16:30', end_time: '18:00', room: '무용실', target_grade: 0, fee: 0, description: '최신 안무를 배우고 함께 무대를 준비합니다.' },
+  ];
+
+  const courseIds = [];
+  for (const c of courseDefs) {
+    const info = insertCourse.run({
+      title: c.title, category: c.category, description: c.description,
+      teacher_id: teacherIds[c.teacher], capacity: c.capacity, day_of_week: c.day_of_week,
+      start_time: c.start_time, end_time: c.end_time, room: c.room,
+      target_grade: c.target_grade, fee: c.fee, semester,
+    });
+    courseIds.push(info.lastInsertRowid);
+  }
+
+  // Some enrollments (respecting grade targeting loosely)
+  const enroll = db.prepare(
+    "INSERT OR IGNORE INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'enrolled')"
+  );
+  for (let i = 0; i < studentIds.length; i++) {
+    const sid = studentIds[i];
+    // enroll each student in ~1-2 open general courses
+    const generalCourses = courseIds.filter((_, idx) => [3, 6, 8, 9].includes(idx)); // 전학년 courses
+    enroll.run(sid, pick(generalCourses, i));
+    if (i % 2 === 0) enroll.run(sid, pick(generalCourses, i + 1));
+  }
+
+  // A few announcements
+  const ann = db.prepare(
+    'INSERT INTO announcements (course_id, author_id, title, content) VALUES (?, ?, ?, ?)'
+  );
+  ann.run(courseIds[0], teacherIds['teacher1'], '첫 수업 안내', '첫 수업은 오리엔테이션으로 진행됩니다. 필기도구를 지참해 주세요.');
+  ann.run(courseIds[8], teacherIds['teacher5'], '준비물 안내', '실내용 운동화와 운동복을 반드시 준비해 주세요.');
+
+  console.log('  ✅  데모 데이터 생성 완료 (관리자 admin/admin123)');
+}
+
+// Allow running directly: `npm run seed`
+if (import.meta.url === `file://${process.argv[1]}`) {
+  ensureSeed();
+  console.log('완료');
+}

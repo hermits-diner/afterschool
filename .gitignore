@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+client/dist/
+
+# Database (created at runtime by seed)
+server/data.sqlite
+server/data.sqlite-shm
+server/data.sqlite-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Logs & env
+*.log
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

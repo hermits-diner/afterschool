@@ -1,0 +1,52 @@
+import { useEffect, useState } from 'react';
+import { api, Course } from '../../lib/api';
+import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import Timetable from '../../components/Timetable';
+
+const DAYS = ['월', '화', '수', '목', '금'];
+
+export default function StudentTimetable() {
+  const [mine, setMine] = useState<Course[] | null>(null);
+
+  useEffect(() => {
+    api.get<{ courses: Course[] }>('/enrollments/mine').then((r) => setMine(r.courses));
+  }, []);
+
+  if (!mine) return <Spinner />;
+  const enrolled = mine.filter((c) => c.enrollment_status === 'enrolled');
+
+  return (
+    <div>
+      <h1 className="mb-1 text-2xl font-bold text-slate-900">내 시간표</h1>
+      <p className="mb-6 text-sm text-slate-500">수강 확정된 강좌의 주간 시간표입니다.</p>
+
+      {enrolled.length === 0 ? (
+        <EmptyState message="수강 확정된 강좌가 없습니다." sub="대기 중인 강좌는 시간표에 표시되지 않습니다." />
+      ) : (
+        <>
+          <Timetable courses={enrolled} />
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {DAYS.map((day) => {
+              const dayCourses = enrolled.filter((c) => c.day_of_week === day).sort((a, b) => a.start_time.localeCompare(b.start_time));
+              if (dayCourses.length === 0) return null;
+              return (
+                <div key={day} className="card p-4">
+                  <h3 className="mb-2 font-bold text-slate-700">{day}요일</h3>
+                  <div className="space-y-2">
+                    {dayCourses.map((c) => (
+                      <div key={c.id} className="flex items-center gap-2 text-sm">
+                        <CategoryBadge category={c.category} />
+                        <span className="font-medium text-slate-800">{c.title}</span>
+                        <span className="ml-auto text-xs text-slate-400">{c.start_time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
