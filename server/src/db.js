@@ -109,6 +109,15 @@ const SCHEMA = [
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS semesters (
+    code        TEXT PRIMARY KEY,          -- '2026-1'
+    name        TEXT NOT NULL,             -- '2026학년도 1학기'
+    registration_open  TEXT NOT NULL DEFAULT 'true',
+    registration_start TEXT,
+    registration_end   TEXT,
+    max_courses_per_student INTEGER NOT NULL DEFAULT 3,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
   'CREATE INDEX IF NOT EXISTS idx_courses_semester ON courses(semester)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_student ON enrollments(student_id)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_course ON enrollments(course_id)',
@@ -139,6 +148,29 @@ export async function initSchema() {
       args: [k, String(v)],
     }))
   );
+
+  // Migrate the active semester (+ legacy flat settings) into the semesters table.
+  const active = await getSetting('semester');
+  if (active) {
+    await run(
+      `INSERT OR IGNORE INTO semesters (code, name, registration_open, registration_start, registration_end, max_courses_per_student)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        active,
+        semesterName(active),
+        (await getSetting('registration_open')) || 'true',
+        await getSetting('registration_start'),
+        await getSetting('registration_end'),
+        Number((await getSetting('max_courses_per_student')) || 3),
+      ]
+    );
+  }
+}
+
+// '2026-1' → '2026학년도 1학기'
+export function semesterName(code) {
+  const m = String(code).match(/^(\d{4})-(\d)$/);
+  return m ? `${m[1]}학년도 ${m[2]}학기` : String(code);
 }
 
 /* ---- Settings ---- */

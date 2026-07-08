@@ -46,7 +46,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/courses', label: '강좌 관리', icon: <Icons.book /> },
   { to: '/admin/users', label: '회원 관리', icon: <Icons.users /> },
   { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard /> },
-  { to: '/admin/settings', label: '운영 설정', icon: <Icons.settings /> },
+  { to: '/admin/settings', label: '세션(학기) 관리', icon: <Icons.settings /> },
 ];
 const teacherNav: NavItem[] = [
   { to: '/teacher', label: '대시보드', icon: <Icons.dashboard /> },

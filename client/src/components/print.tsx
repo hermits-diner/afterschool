@@ -1,6 +1,7 @@
 import { CSSProperties, ReactNode } from 'react';
 import { Icons } from './icons';
-import { SEMESTER_LABEL, todayString } from '../lib/format';
+import { todayString } from '../lib/format';
+import { useSemesterLabel } from '../lib/useSemester';
 
 // Shared chrome for standalone print routes: preview toolbar + paper sheet + document header.
 export function PrintShell({
@@ -17,6 +18,7 @@ export function PrintShell({
   children: ReactNode;
 }) {
   const maxW = { md: 'max-w-3xl', lg: 'max-w-4xl', xl: 'max-w-5xl' }[width];
+  const semesterLabel = useSemesterLabel();
   return (
     <div className="min-h-full bg-slate-100 py-8 print:bg-white print:py-0">
       {pageStyle && <style>{pageStyle}</style>}
@@ -28,7 +30,7 @@ export function PrintShell({
         </button>
       </div>
       <div className={`print-sheet mx-auto ${maxW} rounded-xl bg-white p-10 shadow-card print:max-w-none print:rounded-none print:p-0 print:shadow-none`}>
-        <div className="mb-1 text-center text-sm text-slate-500">{SEMESTER_LABEL}</div>
+        <div className="mb-1 text-center text-sm text-slate-500">{semesterLabel}</div>
         <h1 className="mb-6 text-center text-2xl font-bold text-slate-900">{title}</h1>
         {children}
       </div>

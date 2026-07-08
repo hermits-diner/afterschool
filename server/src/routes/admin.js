@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { all, get, run, batch, getSettings, setSetting } from '../db.js';
+import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
 import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster } from '../logic.js';
 
@@ -43,21 +43,117 @@ router.get('/stats', ah(async (req, res) => {
   res.json({ counts, byCategory, popularCourses: courses });
 }));
 
-/* ---------------- Settings ---------------- */
-router.get('/settings', ah(async (req, res) => res.json({ settings: await getSettings() })));
+/* ---------------- Semester (세션) management ---------------- */
+const semesterSchema = z.object({
+  code: z.string().regex(/^\d{4}-[12]$/, "세션 코드는 '2026-1' 형식이어야 합니다."),
+  name: z.string().optional(),
+  registration_open: z.union([z.boolean(), z.string()]).optional(),
+  registration_start: z.string().optional().nullable(),
+  registration_end: z.string().optional().nullable(),
+  max_courses_per_student: z.union([z.number(), z.string()]).optional(),
+});
 
-router.put('/settings', ah(async (req, res) => {
-  const schema = z.object({
-    semester: z.string().optional(),
-    registration_open: z.union([z.boolean(), z.string()]).optional(),
-    registration_start: z.string().optional(),
-    registration_end: z.string().optional(),
-    max_courses_per_student: z.union([z.number(), z.string()]).optional(),
+// List all semesters with per-semester course/enrollment counts.
+router.get('/semesters', ah(async (req, res) => {
+  const active = (await getSettings()).semester;
+  const rows = await all('SELECT * FROM semesters ORDER BY code DESC');
+  const courseCounts = await all('SELECT semester, COUNT(*) c FROM courses GROUP BY semester');
+  const enrollCounts = await all(
+    `SELECT c.semester, COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id
+     WHERE e.status != 'cancelled' GROUP BY c.semester`
+  );
+  const cMap = Object.fromEntries(courseCounts.map((r) => [r.semester, r.c]));
+  const eMap = Object.fromEntries(enrollCounts.map((r) => [r.semester, r.c]));
+  res.json({
+    semesters: rows.map((r) => ({
+      ...r,
+      is_active: r.code === active,
+      course_count: cMap[r.code] || 0,
+      enrollment_count: eMap[r.code] || 0,
+    })),
   });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: '설정값이 올바르지 않습니다.' });
-  for (const [k, v] of Object.entries(parsed.data)) await setSetting(k, v);
-  res.json({ settings: await getSettings() });
+}));
+
+// Create a new semester (session).
+router.post('/semesters', ah(async (req, res) => {
+  const parsed = semesterSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
+  const dupe = await get('SELECT code FROM semesters WHERE code = ?', [d.code]);
+  if (dupe) return res.status(409).json({ error: '이미 존재하는 세션 코드입니다.' });
+  await run(
+    `INSERT INTO semesters (code, name, registration_open, registration_start, registration_end, max_courses_per_student)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      d.code,
+      d.name || semesterName(d.code),
+      String(d.registration_open ?? 'true') === 'true' ? 'true' : 'false',
+      d.registration_start || null,
+      d.registration_end || null,
+      Number(d.max_courses_per_student || 3),
+    ]
+  );
+  const row = await get('SELECT * FROM semesters WHERE code = ?', [d.code]);
+  res.status(201).json({ semester: row });
+}));
+
+// Update a semester's settings.
+router.put('/semesters/:code', ah(async (req, res) => {
+  const existing = await get('SELECT * FROM semesters WHERE code = ?', [req.params.code]);
+  if (!existing) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+  const parsed = semesterSchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
+  const merged = {
+    name: d.name ?? existing.name,
+    registration_open:
+      d.registration_open !== undefined
+        ? String(d.registration_open) === 'true'
+          ? 'true'
+          : 'false'
+        : existing.registration_open,
+    registration_start: d.registration_start !== undefined ? d.registration_start || null : existing.registration_start,
+    registration_end: d.registration_end !== undefined ? d.registration_end || null : existing.registration_end,
+    max_courses_per_student:
+      d.max_courses_per_student !== undefined
+        ? Number(d.max_courses_per_student)
+        : existing.max_courses_per_student,
+  };
+  await run(
+    `UPDATE semesters SET name=?, registration_open=?, registration_start=?, registration_end=?, max_courses_per_student=?
+     WHERE code=?`,
+    [merged.name, merged.registration_open, merged.registration_start, merged.registration_end, merged.max_courses_per_student, existing.code]
+  );
+  res.json({ semester: await get('SELECT * FROM semesters WHERE code = ?', [existing.code]) });
+}));
+
+// Switch the active session — new courses/신청 화면이 이 세션 기준으로 동작.
+router.post('/semesters/:code/activate', ah(async (req, res) => {
+  const existing = await get('SELECT * FROM semesters WHERE code = ?', [req.params.code]);
+  if (!existing) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+  await setSetting('semester', existing.code);
+  res.json({ ok: true, active: existing.code });
+}));
+
+// Delete a semester AND everything linked to it:
+// 강좌 → 수강신청 → 출석 → 공지 모두 함께 삭제 (단일 트랜잭션).
+router.delete('/semesters/:code', ah(async (req, res) => {
+  const code = req.params.code;
+  const existing = await get('SELECT * FROM semesters WHERE code = ?', [code]);
+  if (!existing) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+  const active = (await getSettings()).semester;
+  if (code === active) {
+    return res.status(400).json({ error: '활성 세션은 삭제할 수 없습니다. 먼저 다른 세션을 활성화하세요.' });
+  }
+  const inSemester = 'SELECT id FROM courses WHERE semester = ?';
+  await batch([
+    { sql: `DELETE FROM attendance WHERE course_id IN (${inSemester})`, args: [code] },
+    { sql: `DELETE FROM announcements WHERE course_id IN (${inSemester})`, args: [code] },
+    { sql: `DELETE FROM enrollments WHERE course_id IN (${inSemester})`, args: [code] },
+    { sql: 'DELETE FROM courses WHERE semester = ?', args: [code] },
+    { sql: 'DELETE FROM semesters WHERE code = ?', args: [code] },
+  ]);
+  res.json({ ok: true });
 }));
 
 /* ---------------- User management ---------------- */

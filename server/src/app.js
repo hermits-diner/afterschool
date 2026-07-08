@@ -6,6 +6,8 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 
 import { ensureSeed } from './seed.js';
+import { authRequired, ah } from './auth.js';
+import { getActiveSemester } from './logic.js';
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
 import enrollmentRoutes from './routes/enrollments.js';
@@ -28,6 +30,12 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// Active session info for header/print labels.
+app.get('/api/meta', authRequired, ah(async (req, res) => {
+  const s = await getActiveSemester();
+  res.json({ semester: { code: s.code, name: s.name } });
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/courses', courseRoutes);

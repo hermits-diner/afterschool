@@ -1,4 +1,21 @@
-import { all, get, run, getSetting } from './db.js';
+import { all, get, run, getSetting, semesterName } from './db.js';
+
+// Active semester row — settings.semester points at the current session code.
+// Registration window / limits are per-semester settings.
+export async function getActiveSemester() {
+  const code = await getSetting('semester');
+  const row = code ? await get('SELECT * FROM semesters WHERE code = ?', [code]) : undefined;
+  if (row) return row;
+  // legacy fallback: flat settings (pre-semesters DB)
+  return {
+    code,
+    name: semesterName(code || ''),
+    registration_open: (await getSetting('registration_open')) || 'true',
+    registration_start: await getSetting('registration_start'),
+    registration_end: await getSetting('registration_end'),
+    max_courses_per_student: Number((await getSetting('max_courses_per_student')) || 3),
+  };
+}
 
 // Count active (enrolled) students for a course.
 export async function enrolledCount(courseId) {
@@ -39,12 +56,11 @@ export async function findScheduleConflict(studentId, course) {
 }
 
 export async function isRegistrationOpen() {
-  if ((await getSetting('registration_open')) !== 'true') return false;
-  const start = await getSetting('registration_start');
-  const end = await getSetting('registration_end');
+  const s = await getActiveSemester();
+  if (s.registration_open !== 'true') return false;
   const today = new Date().toISOString().slice(0, 10);
-  if (start && today < start) return false;
-  if (end && today > end) return false;
+  if (s.registration_start && today < s.registration_start) return false;
+  if (s.registration_end && today > s.registration_end) return false;
   return true;
 }
 

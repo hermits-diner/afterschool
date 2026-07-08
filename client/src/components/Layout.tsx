@@ -1,7 +1,8 @@
 import { ReactNode, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { roleLabel, SEMESTER_LABEL } from '../lib/format';
+import { roleLabel } from '../lib/format';
+import { useSemesterLabel } from '../lib/useSemester';
 import { Icons } from './icons';
 
 export interface NavItem {
@@ -14,6 +15,7 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const semesterLabel = useSemesterLabel();
 
   const roleTheme: Record<string, string> = {
     admin: 'from-slate-800 to-slate-950',
@@ -108,7 +110,7 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
           </button>
           <div className="hidden items-center gap-2 text-sm text-slate-500 lg:flex">
             <Icons.calendar size={16} className="text-slate-400" />
-            {SEMESTER_LABEL}
+            {semesterLabel}
           </div>
           <div className="flex items-center gap-4">
             <NavLink to="settings/password" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">

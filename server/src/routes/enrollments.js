@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { all, get, run, getSetting } from '../db.js';
+import { all, get, run } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
 import {
   enrolledCount,
@@ -8,6 +8,7 @@ import {
   isRegistrationOpen,
   promoteWaitlist,
   decorateCourses,
+  getActiveSemester,
 } from '../logic.js';
 
 const router = Router();
@@ -63,8 +64,8 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
     return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
   }
 
-  // max courses limit
-  const max = Number((await getSetting('max_courses_per_student')) || 3);
+  // max courses limit (세션별 설정)
+  const max = Number((await getActiveSemester()).max_courses_per_student || 3);
   const activeRow = await get(
     "SELECT COUNT(*) AS c FROM enrollments WHERE student_id = ? AND status IN ('enrolled','waitlisted')",
     [student.id]
