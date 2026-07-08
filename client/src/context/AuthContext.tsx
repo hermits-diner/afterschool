@@ -5,7 +5,6 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (username: string, password: string, role?: Role) => Promise<User>;
-  googleLogin: (credential: string, role?: Role) => Promise<User>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -41,16 +40,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return r.user;
   }
 
-  async function googleLogin(credential: string, role?: Role) {
-    const r = await api.post<{ token: string; user: User }>('/auth/google', {
-      credential,
-      role,
-    });
-    setToken(r.token);
-    setUser(r.user);
-    return r.user;
-  }
-
   function logout() {
     api.post('/auth/logout').catch(() => {});
     setToken(null);
@@ -63,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, googleLogin, logout, refresh }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

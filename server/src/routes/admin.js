@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
-import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster } from '../logic.js';
+import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -217,10 +216,9 @@ router.post('/users', ah(async (req, res) => {
   res.status(201).json({ user: publicUser(user) });
 }));
 
-// Bulk-register students: 학번(학년/반/번호) + 이름 + 이메일(구글 로그인용) 그리고/또는 임시비밀번호.
-// username = 학번 5자리 (예: 1학년 2반 3번 → '10203').
-// - 임시비밀번호가 있으면 첫 로그인 시 비밀번호 변경 강제
-// - 이메일만 있으면 비밀번호 로그인 불가(랜덤 해시) — Google Workspace 로그인 전용 계정
+// Bulk-register students: 학번(학년/반/번호) + 이름 + 임시비밀번호.
+// username = 활성 세션 연도 + 학번 (예: 2026년 1학년 2반 3번 → '202610203').
+// 첫 로그인 시 비밀번호 변경 강제.
 router.post('/users/bulk', ah(async (req, res) => {
   const schema = z.object({
     students: z
@@ -230,8 +228,7 @@ router.post('/users/bulk', ah(async (req, res) => {
           class_no: z.number().int().min(1).max(99),
           student_no: z.number().int().min(1).max(99),
           name: z.string().min(1),
-          email: z.string().email().optional(),
-          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.').optional(),
+          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.'),
         })
       )
       .min(1)
@@ -240,42 +237,26 @@ router.post('/users/bulk', ah(async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
 
+  const semester = await getActiveSemester();
+  const yearMatch = String(semester.code || '').match(/^(\d{4})/);
+  const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
+
   const pad2 = (n) => String(n).padStart(2, '0');
   const created = [];
   const skipped = [];
   for (const s of parsed.data.students) {
-    const username = `${s.grade}${pad2(s.class_no)}${pad2(s.student_no)}`;
-    if (!s.password && !s.email) {
-      skipped.push({ username, name: s.name, reason: '이메일 또는 임시비밀번호 중 하나는 필요' });
-      continue;
-    }
+    const username = `${year}${s.grade}${pad2(s.class_no)}${pad2(s.student_no)}`;
     const dupe = await get('SELECT id FROM users WHERE username = ?', [username]);
     if (dupe) {
-      skipped.push({ username, name: s.name, reason: '이미 존재하는 학번' });
+      skipped.push({ username, name: s.name, reason: '이미 존재하는 아이디' });
       continue;
     }
-    if (s.email) {
-      const emailDupe = await get('SELECT id FROM users WHERE email = ?', [s.email]);
-      if (emailDupe) {
-        skipped.push({ username, name: s.name, reason: `이미 등록된 이메일 (${s.email})` });
-        continue;
-      }
-    }
     await run(
-      `INSERT INTO users (username, password_hash, role, name, email, grade, class_no, student_no, must_change_password)
-       VALUES (?, ?, 'student', ?, ?, ?, ?, ?, ?)`,
-      [
-        username,
-        hashPassword(s.password || randomUUID()),
-        s.name,
-        s.email || null,
-        s.grade,
-        s.class_no,
-        s.student_no,
-        s.password ? 1 : 0,
-      ]
+      `INSERT INTO users (username, password_hash, role, name, grade, class_no, student_no, must_change_password)
+       VALUES (?, ?, 'student', ?, ?, ?, ?, 1)`,
+      [username, hashPassword(s.password), s.name, s.grade, s.class_no, s.student_no]
     );
-    created.push({ username, name: s.name, email: s.email || null });
+    created.push({ username, name: s.name });
   }
   res.status(201).json({ created, skipped });
 }));
