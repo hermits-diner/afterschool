@@ -77,6 +77,23 @@ TURSO_AUTH_TOKEN=<token>
 Vercel에서는 프로젝트 **Settings → Environment Variables**에 위 두 값을 추가하고 재배포하면 됩니다.
 최초 접속 시 스키마 생성과 데모 데이터 시드가 자동으로 실행됩니다.
 
+### Google Workspace 로그인 — 선택
+
+학생이 학교 구글 계정으로 로그인하게 하려면:
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → OAuth 클라이언트 ID(웹) 생성
+   - 승인된 자바스크립트 원본에 배포 도메인 추가 (예: `https://afterschool-navy.vercel.app`)
+2. 환경변수 설정 후 재배포:
+
+```bash
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+ALLOWED_GOOGLE_DOMAIN=school.hs.kr   # 선택: 학교 워크스페이스 도메인만 허용
+```
+
+- 설정 시 로그인 화면에 "Google로 로그인" 버튼이 나타납니다.
+- 회원 일괄등록에서 `학번 이름 이메일` 형식으로 등록하면 해당 학생은 비밀번호 없이 구글 계정으로 로그인합니다.
+- 미등록 이메일은 로그인할 수 없습니다 (관리자 등록 필수).
+
 ## 👤 데모 계정
 
 | 역할 | 아이디 | 비밀번호 |

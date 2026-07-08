@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Role } from '../lib/api';
+import { api, Role } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { Check, GraduationCap } from 'lucide-react';
 
@@ -17,14 +17,60 @@ const DEMO: Record<Role, { id: string; pw: string }> = {
   admin: { id: 'admin', pw: 'admin123' },
 };
 
+interface GoogleCfg {
+  enabled: boolean;
+  client_id: string | null;
+  domain: string | null;
+}
+
 export default function Login() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const [role, setRole] = useState<Role>('student');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleCfg, setGoogleCfg] = useState<GoogleCfg | null>(null);
+  const roleRef = useRef<Role>('student');
+  roleRef.current = role;
+
+  useEffect(() => {
+    api.get<GoogleCfg>('/auth/google/config').then(setGoogleCfg).catch(() => {});
+  }, []);
+
+  // Google Identity Services 버튼 (설정된 경우에만)
+  useEffect(() => {
+    if (!googleCfg?.enabled || !googleCfg.client_id) return;
+    function init() {
+      const g = (window as any).google;
+      if (!g?.accounts?.id) return;
+      g.accounts.id.initialize({
+        client_id: googleCfg!.client_id,
+        callback: async (resp: any) => {
+          setError('');
+          try {
+            const user = await googleLogin(resp.credential, roleRef.current);
+            navigate(`/${user.role}`, { replace: true });
+          } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'Google 로그인에 실패했습니다.');
+          }
+        },
+      });
+      const el = document.getElementById('google-signin');
+      if (el) g.accounts.id.renderButton(el, { theme: 'outline', size: 'large', width: 320, text: 'signin_with', locale: 'ko' });
+    }
+    if ((window as any).google?.accounts?.id) {
+      init();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.onload = init;
+    document.head.appendChild(script);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleCfg]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -141,6 +187,20 @@ export default function Login() {
                 {loading ? '로그인 중...' : '로그인'}
               </button>
             </form>
+
+            {googleCfg?.enabled && (
+              <div className="mt-4">
+                <div className="mb-3 flex items-center gap-3 text-xs text-slate-400">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  또는 학교 구글 계정으로
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
+                <div id="google-signin" className="flex justify-center" />
+                {googleCfg.domain && (
+                  <p className="mt-2 text-center text-xs text-slate-400">@{googleCfg.domain} 계정만 로그인할 수 있습니다.</p>
+                )}
+              </div>
+            )}
 
             <button
               onClick={fillDemo}

@@ -128,7 +128,7 @@ export default function AdminCourses() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">강좌 관리</h1>
-          <p className="text-sm text-slate-500">방과후 강좌를 개설하고 정원·시간을 관리합니다.</p>
+          <p className="text-sm text-slate-500">강좌는 기본적으로 강사가 개설합니다. 여기서는 미개설 강좌 추가, 정원 조정, 마감/폐강/삭제를 관리합니다.</p>
         </div>
         <button className="btn-primary" onClick={openCreate}>
           <Icons.plus size={16} /> 강좌 개설

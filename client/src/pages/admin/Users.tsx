@@ -16,7 +16,8 @@ interface BulkRow {
   class_no: number;
   student_no: number;
   name: string;
-  password: string;
+  email?: string;
+  password?: string;
 }
 
 // '10203' 또는 '1-2-3' 형식의 학번을 파싱한다.
@@ -103,12 +104,23 @@ export default function AdminUsers() {
           return;
         }
         const name = parts[1];
-        const password = parts[2] || bulkPw;
-        if (!password || password.length < 4) {
-          errors.push(`${i + 1}행: 임시비밀번호 없음/4자 미만 (공통 임시비밀번호를 입력하세요)`);
+        // 3번째 이후 컬럼: '@' 포함 → 구글 이메일, 그 외 → 임시비밀번호
+        let email: string | undefined;
+        let password: string | undefined;
+        for (const t of parts.slice(2)) {
+          if (t.includes('@')) email = t;
+          else password = t;
+        }
+        if (!password && bulkPw) password = bulkPw;
+        if (!email && !password) {
+          errors.push(`${i + 1}행: 이메일 또는 임시비밀번호가 필요합니다 (공통 임시비밀번호 입력 가능)`);
           return;
         }
-        rows.push({ ...sid, name, password });
+        if (password && password.length < 4) {
+          errors.push(`${i + 1}행: 임시비밀번호는 4자 이상이어야 합니다`);
+          return;
+        }
+        rows.push({ ...sid, name, email, password });
       });
     return { rows, errors };
   }, [bulkText, bulkPw]);
@@ -263,7 +275,7 @@ export default function AdminUsers() {
                   <th className="th">아이디</th>
                   {tab === 'student' && <th className="th">학년/반/번호</th>}
                   {tab === 'teacher' && <th className="th">담당 분야</th>}
-                  <th className="th">연락처</th>
+                  <th className="th">{tab === 'student' ? '구글 이메일' : '연락처'}</th>
                   <th className="th">상태</th>
                   <th className="th text-right">관리</th>
                 </tr>
@@ -288,7 +300,7 @@ export default function AdminUsers() {
                     </td>
                     {tab === 'student' && <td className="td">{studentLabel(u.grade, u.class_no, u.student_no)}</td>}
                     {tab === 'teacher' && <td className="td">{u.subject_area || '-'}</td>}
-                    <td className="td text-slate-500">{u.phone || '-'}</td>
+                    <td className="td text-slate-500">{tab === 'student' ? u.email || '-' : u.phone || '-'}</td>
                     <td className="td">
                       <span className={`badge ${u.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
                         {u.active ? '활성' : '비활성'}
@@ -327,7 +339,8 @@ export default function AdminUsers() {
               </div>
             )}
             <p className="mb-4 text-sm text-slate-500">
-              등록된 학생은 <b>아이디 = 학번</b>, 입력한 임시비밀번호로 로그인하며, 첫 로그인 시 비밀번호 변경이 필요합니다.
+              이메일을 넣은 학생은 <b>학교 구글 계정으로 바로 로그인</b>합니다. 임시비밀번호로 등록된 학생은
+              <b> 아이디 = 학번</b>으로 로그인 후 비밀번호를 변경해야 합니다.
             </p>
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => setBulkResult(null)}>더 등록하기</button>
@@ -337,15 +350,16 @@ export default function AdminUsers() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 명씩 <b>학번 이름 [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
+              한 줄에 한 명씩 <b>학번 이름 [구글이메일] [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
               <div className="mt-1 font-mono text-xs text-slate-500">
-                10101 김민준 pass1234<br />
-                1-1-2 이서연 <span className="text-slate-400">← 비밀번호 생략 시 아래 공통 임시비밀번호 적용</span>
+                10101 김민준 minjun@school.hs.kr <span className="text-slate-400">← 학교 구글 계정으로 로그인 (비밀번호 불필요)</span><br />
+                10102 이서연 seoyeon@school.hs.kr pass12 <span className="text-slate-400">← 구글 + 비밀번호 둘 다</span><br />
+                10103 박도윤 <span className="text-slate-400">← 이메일 없이 공통 임시비밀번호로 등록</span>
               </div>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'10101 김민준 pass1234\n10102 이서연\n10103 박도윤'}
+              placeholder={'10101 김민준 minjun@school.hs.kr\n10102 이서연 seoyeon@school.hs.kr\n10103 박도윤 pass1234'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />

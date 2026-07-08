@@ -27,7 +27,7 @@ export default function TeacherDashboard() {
 
       <h2 className="mb-3 mt-8 text-base font-bold text-slate-900">담당 강좌</h2>
       {summary.courses.length === 0 ? (
-        <EmptyState message="배정된 강좌가 없습니다." sub="관리자에게 강좌 배정을 요청하세요." />
+        <EmptyState message="담당 강좌가 없습니다." sub="'내 강좌' 메뉴에서 강좌를 직접 개설할 수 있습니다." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {summary.courses.map((c) => (

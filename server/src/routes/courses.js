@@ -83,13 +83,14 @@ function courseValues(d) {
   ];
 }
 
-// Create course (admin)
-router.post('/', authRequired, requireRole('admin'), ah(async (req, res) => {
+// Create course — 강사는 자기 강좌를 직접 개설, 관리자는 누구에게든 배정 가능.
+router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
   const parsed = courseSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
   const d = parsed.data;
+  if (req.user.role === 'teacher') d.teacher_id = req.user.id; // 강사는 본인 강좌만
   if (d.start_time >= d.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
   }
@@ -106,13 +107,17 @@ router.post('/', authRequired, requireRole('admin'), ah(async (req, res) => {
   res.status(201).json({ course: await decorateCourse(course) });
 }));
 
-// Update course (admin)
-router.put('/:id', authRequired, requireRole('admin'), ah(async (req, res) => {
+// Update course — 관리자 전체, 강사는 본인 담당 강좌만 (정원 조정 등 포함).
+router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
   const existing = await get('SELECT * FROM courses WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  if (req.user.role === 'teacher' && existing.teacher_id !== req.user.id) {
+    return res.status(403).json({ error: '담당 강좌만 수정할 수 있습니다.' });
+  }
   const parsed = courseSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const merged = { ...existing, ...parsed.data };
+  if (req.user.role === 'teacher') merged.teacher_id = existing.teacher_id; // 담당 강사 변경은 관리자만
   if (merged.start_time >= merged.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
   }
@@ -126,13 +131,16 @@ router.put('/:id', authRequired, requireRole('admin'), ah(async (req, res) => {
   res.json({ course: await decorateCourse(course) });
 }));
 
-// Cancel/close a course (admin) — soft, keeps enrollments for record
-router.patch('/:id/status', authRequired, requireRole('admin'), ah(async (req, res) => {
+// Cancel/close a course — 관리자 전체, 강사는 본인 강좌만. soft, keeps enrollments for record
+router.patch('/:id/status', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
   const schema = z.object({ status: z.enum(['open', 'closed', 'cancelled']) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '잘못된 상태값입니다.' });
   const course = await get('SELECT * FROM courses WHERE id = ?', [req.params.id]);
   if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  if (req.user.role === 'teacher' && course.teacher_id !== req.user.id) {
+    return res.status(403).json({ error: '담당 강좌만 변경할 수 있습니다.' });
+  }
   await run('UPDATE courses SET status = ? WHERE id = ?', [parsed.data.status, course.id]);
   res.json({ ok: true });
 }));

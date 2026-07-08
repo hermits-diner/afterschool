@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
@@ -216,8 +217,10 @@ router.post('/users', ah(async (req, res) => {
   res.status(201).json({ user: publicUser(user) });
 }));
 
-// Bulk-register students: 학번(학년/반/번호) + 이름 + 임시비밀번호.
-// username = 학번 5자리 (예: 1학년 2반 3번 → '10203'), 첫 로그인 시 비밀번호 변경 강제.
+// Bulk-register students: 학번(학년/반/번호) + 이름 + 이메일(구글 로그인용) 그리고/또는 임시비밀번호.
+// username = 학번 5자리 (예: 1학년 2반 3번 → '10203').
+// - 임시비밀번호가 있으면 첫 로그인 시 비밀번호 변경 강제
+// - 이메일만 있으면 비밀번호 로그인 불가(랜덤 해시) — Google Workspace 로그인 전용 계정
 router.post('/users/bulk', ah(async (req, res) => {
   const schema = z.object({
     students: z
@@ -227,7 +230,8 @@ router.post('/users/bulk', ah(async (req, res) => {
           class_no: z.number().int().min(1).max(99),
           student_no: z.number().int().min(1).max(99),
           name: z.string().min(1),
-          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.'),
+          email: z.string().email().optional(),
+          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.').optional(),
         })
       )
       .min(1)
@@ -241,17 +245,37 @@ router.post('/users/bulk', ah(async (req, res) => {
   const skipped = [];
   for (const s of parsed.data.students) {
     const username = `${s.grade}${pad2(s.class_no)}${pad2(s.student_no)}`;
+    if (!s.password && !s.email) {
+      skipped.push({ username, name: s.name, reason: '이메일 또는 임시비밀번호 중 하나는 필요' });
+      continue;
+    }
     const dupe = await get('SELECT id FROM users WHERE username = ?', [username]);
     if (dupe) {
       skipped.push({ username, name: s.name, reason: '이미 존재하는 학번' });
       continue;
     }
+    if (s.email) {
+      const emailDupe = await get('SELECT id FROM users WHERE email = ?', [s.email]);
+      if (emailDupe) {
+        skipped.push({ username, name: s.name, reason: `이미 등록된 이메일 (${s.email})` });
+        continue;
+      }
+    }
     await run(
-      `INSERT INTO users (username, password_hash, role, name, grade, class_no, student_no, must_change_password)
-       VALUES (?, ?, 'student', ?, ?, ?, ?, 1)`,
-      [username, hashPassword(s.password), s.name, s.grade, s.class_no, s.student_no]
+      `INSERT INTO users (username, password_hash, role, name, email, grade, class_no, student_no, must_change_password)
+       VALUES (?, ?, 'student', ?, ?, ?, ?, ?, ?)`,
+      [
+        username,
+        hashPassword(s.password || randomUUID()),
+        s.name,
+        s.email || null,
+        s.grade,
+        s.class_no,
+        s.student_no,
+        s.password ? 1 : 0,
+      ]
     );
-    created.push({ username, name: s.name });
+    created.push({ username, name: s.name, email: s.email || null });
   }
   res.status(201).json({ created, skipped });
 }));
