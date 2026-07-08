@@ -21,3 +21,6 @@ server/data.sqlite-wal
 .DS_Store
 .vscode/
 .idea/
+
+# Vercel
+.vercel/

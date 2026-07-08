@@ -3,7 +3,11 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DB_PATH || join(__dirname, '..', 'data.sqlite');
+// On serverless (Vercel) the code dir is read-only — keep the DB in /tmp.
+// Note: /tmp is ephemeral there, so data resets on cold starts (demo mode).
+const DB_PATH =
+  process.env.DB_PATH ||
+  (process.env.VERCEL ? '/tmp/data.sqlite' : join(__dirname, '..', 'data.sqlite'));
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
