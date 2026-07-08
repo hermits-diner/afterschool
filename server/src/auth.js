@@ -43,3 +43,6 @@ export function requireRole(...roles) {
     next();
   };
 }
+
+// Async handler wrapper — routes rejections to the Express error middleware.
+export const ah = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);

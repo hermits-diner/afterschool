@@ -1,56 +1,52 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import db, { getSettings, setSetting } from '../db.js';
-import { authRequired, requireRole, hashPassword } from '../auth.js';
-import { publicUser, decorateCourse, promoteWaitlist, getCourseRoster } from '../logic.js';
+import { all, get, run, batch, getSettings, setSetting } from '../db.js';
+import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
+import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
 
 /* ---------------- Dashboard statistics ---------------- */
-router.get('/stats', (req, res) => {
-  const semester = getSettings().semester;
+router.get('/stats', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  const count = async (sql, args) => (await get(sql, args)).c;
   const counts = {
-    students: db.prepare("SELECT COUNT(*) c FROM users WHERE role='student' AND active=1").get().c,
-    teachers: db.prepare("SELECT COUNT(*) c FROM users WHERE role='teacher' AND active=1").get().c,
-    courses: db.prepare('SELECT COUNT(*) c FROM courses WHERE semester=?').get(semester).c,
-    open_courses: db.prepare("SELECT COUNT(*) c FROM courses WHERE semester=? AND status='open'").get(semester).c,
-    enrollments: db
-      .prepare(
-        "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='enrolled' AND c.semester=?"
-      )
-      .get(semester).c,
-    waitlisted: db
-      .prepare(
-        "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='waitlisted' AND c.semester=?"
-      )
-      .get(semester).c,
+    students: await count("SELECT COUNT(*) c FROM users WHERE role='student' AND active=1"),
+    teachers: await count("SELECT COUNT(*) c FROM users WHERE role='teacher' AND active=1"),
+    courses: await count('SELECT COUNT(*) c FROM courses WHERE semester=?', [semester]),
+    open_courses: await count("SELECT COUNT(*) c FROM courses WHERE semester=? AND status='open'", [semester]),
+    enrollments: await count(
+      "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='enrolled' AND c.semester=?",
+      [semester]
+    ),
+    waitlisted: await count(
+      "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='waitlisted' AND c.semester=?",
+      [semester]
+    ),
   };
 
   // enrollment by category
-  const byCategory = db
-    .prepare(
-      `SELECT c.category, COUNT(e.id) AS count
-       FROM courses c LEFT JOIN enrollments e ON e.course_id=c.id AND e.status='enrolled'
-       WHERE c.semester=? GROUP BY c.category ORDER BY count DESC`
-    )
-    .all(semester);
+  const byCategory = await all(
+    `SELECT c.category, COUNT(e.id) AS count
+     FROM courses c LEFT JOIN enrollments e ON e.course_id=c.id AND e.status='enrolled'
+     WHERE c.semester=? GROUP BY c.category ORDER BY count DESC`,
+    [semester]
+  );
 
   // top courses by fill rate
-  const courses = db
-    .prepare("SELECT * FROM courses WHERE semester=? AND status='open'")
-    .all(semester)
-    .map(decorateCourse)
+  const openCourses = await all("SELECT * FROM courses WHERE semester=? AND status='open'", [semester]);
+  const courses = (await decorateCourses(openCourses))
     .sort((a, b) => b.enrolled_count / b.capacity - a.enrolled_count / a.capacity)
     .slice(0, 5);
 
   res.json({ counts, byCategory, popularCourses: courses });
-});
+}));
 
 /* ---------------- Settings ---------------- */
-router.get('/settings', (req, res) => res.json({ settings: getSettings() }));
+router.get('/settings', ah(async (req, res) => res.json({ settings: await getSettings() })));
 
-router.put('/settings', (req, res) => {
+router.put('/settings', ah(async (req, res) => {
   const schema = z.object({
     semester: z.string().optional(),
     registration_open: z.union([z.boolean(), z.string()]).optional(),
@@ -60,12 +56,12 @@ router.put('/settings', (req, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '설정값이 올바르지 않습니다.' });
-  for (const [k, v] of Object.entries(parsed.data)) setSetting(k, v);
-  res.json({ settings: getSettings() });
-});
+  for (const [k, v] of Object.entries(parsed.data)) await setSetting(k, v);
+  res.json({ settings: await getSettings() });
+}));
 
 /* ---------------- User management ---------------- */
-router.get('/users', (req, res) => {
+router.get('/users', ah(async (req, res) => {
   const { role, q } = req.query;
   const clauses = [];
   const params = [];
@@ -78,9 +74,12 @@ router.get('/users', (req, res) => {
     params.push(`%${q}%`, `%${q}%`);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = db.prepare(`SELECT * FROM users ${where} ORDER BY role, grade, class_no, student_no, name`).all(...params);
+  const rows = await all(
+    `SELECT * FROM users ${where} ORDER BY role, grade, class_no, student_no, name`,
+    params
+  );
   res.json({ users: rows.map(publicUser) });
-});
+}));
 
 const userSchema = z.object({
   username: z.string().min(3, '아이디는 3자 이상이어야 합니다.'),
@@ -95,35 +94,34 @@ const userSchema = z.object({
   subject_area: z.string().optional(),
 });
 
-router.post('/users', (req, res) => {
+router.post('/users', ah(async (req, res) => {
   const parsed = userSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
-  const dupe = db.prepare('SELECT id FROM users WHERE username = ?').get(d.username);
+  const dupe = await get('SELECT id FROM users WHERE username = ?', [d.username]);
   if (dupe) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
-  const info = db
-    .prepare(
-      `INSERT INTO users (username, password_hash, role, name, email, phone, grade, class_no, student_no, subject_area)
-       VALUES (@username,@hash,@role,@name,@email,@phone,@grade,@class_no,@student_no,@subject_area)`
-    )
-    .run({
-      username: d.username,
-      hash: hashPassword(d.password),
-      role: d.role,
-      name: d.name,
-      email: d.email || null,
-      phone: d.phone || null,
-      grade: d.grade ?? null,
-      class_no: d.class_no ?? null,
-      student_no: d.student_no ?? null,
-      subject_area: d.subject_area || null,
-    });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+  const info = await run(
+    `INSERT INTO users (username, password_hash, role, name, email, phone, grade, class_no, student_no, subject_area)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      d.username,
+      hashPassword(d.password),
+      d.role,
+      d.name,
+      d.email || null,
+      d.phone || null,
+      d.grade ?? null,
+      d.class_no ?? null,
+      d.student_no ?? null,
+      d.subject_area || null,
+    ]
+  );
+  const user = await get('SELECT * FROM users WHERE id = ?', [info.lastInsertRowid]);
   res.status(201).json({ user: publicUser(user) });
-});
+}));
 
-router.put('/users/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+router.put('/users/:id', ah(async (req, res) => {
+  const existing = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   const schema = userSchema.partial().extend({ active: z.boolean().optional() });
   const parsed = schema.safeParse(req.body);
@@ -136,63 +134,71 @@ router.put('/users/:id', (req, res) => {
     active: d.active !== undefined ? (d.active ? 1 : 0) : existing.active,
     password_hash: d.password ? hashPassword(d.password) : existing.password_hash,
   };
-  db.prepare(
-    `UPDATE users SET password_hash=@password_hash, name=@name, email=@email, phone=@phone,
-     grade=@grade, class_no=@class_no, student_no=@student_no, subject_area=@subject_area, active=@active
-     WHERE id=@id`
-  ).run({
-    id: existing.id,
-    password_hash: merged.password_hash,
-    name: merged.name,
-    email: merged.email,
-    phone: merged.phone,
-    grade: merged.grade ?? null,
-    class_no: merged.class_no ?? null,
-    student_no: merged.student_no ?? null,
-    subject_area: merged.subject_area || null,
-    active: merged.active,
-  });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id);
+  await run(
+    `UPDATE users SET password_hash=?, name=?, email=?, phone=?,
+     grade=?, class_no=?, student_no=?, subject_area=?, active=?
+     WHERE id=?`,
+    [
+      merged.password_hash,
+      merged.name,
+      merged.email,
+      merged.phone,
+      merged.grade ?? null,
+      merged.class_no ?? null,
+      merged.student_no ?? null,
+      merged.subject_area || null,
+      merged.active,
+      existing.id,
+    ]
+  );
+  const user = await get('SELECT * FROM users WHERE id = ?', [existing.id]);
   res.json({ user: publicUser(user) });
-});
+}));
 
-router.delete('/users/:id', (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+// Delete user — children removed explicitly so behavior doesn't depend on
+// the remote DB's foreign_keys pragma.
+router.delete('/users/:id', ah(async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   if (user.id === req.user.id) return res.status(400).json({ error: '본인 계정은 삭제할 수 없습니다.' });
-  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  await batch([
+    { sql: 'DELETE FROM attendance WHERE student_id = ?', args: [user.id] },
+    { sql: 'DELETE FROM enrollments WHERE student_id = ?', args: [user.id] },
+    { sql: 'UPDATE announcements SET author_id = NULL WHERE author_id = ?', args: [user.id] },
+    { sql: 'UPDATE courses SET teacher_id = NULL WHERE teacher_id = ?', args: [user.id] },
+    { sql: 'DELETE FROM users WHERE id = ?', args: [user.id] },
+  ]);
   res.json({ ok: true });
-});
+}));
 
 /* ---------------- Enrollment management ---------------- */
 // Roster for any course (신청순 — 대기 순번 확인용)
-router.get('/courses/:id/roster', (req, res) => {
-  res.json({ roster: getCourseRoster(req.params.id, 'created') });
-});
+router.get('/courses/:id/roster', ah(async (req, res) => {
+  res.json({ roster: await getCourseRoster(req.params.id, 'created') });
+}));
 
 // Force-remove a student from a course (admin)
-router.delete('/enrollments/:id', (req, res) => {
-  const enrollment = db.prepare('SELECT * FROM enrollments WHERE id = ?').get(req.params.id);
+router.delete('/enrollments/:id', ah(async (req, res) => {
+  const enrollment = await get('SELECT * FROM enrollments WHERE id = ?', [req.params.id]);
   if (!enrollment) return res.status(404).json({ error: '신청 내역을 찾을 수 없습니다.' });
   const wasEnrolled = enrollment.status === 'enrolled';
-  db.prepare("UPDATE enrollments SET status='cancelled' WHERE id = ?").run(enrollment.id);
-  if (wasEnrolled) promoteWaitlist(enrollment.course_id);
+  await run("UPDATE enrollments SET status='cancelled' WHERE id = ?", [enrollment.id]);
+  if (wasEnrolled) await promoteWaitlist(enrollment.course_id);
   res.json({ ok: true });
-});
+}));
 
 // All enrollments overview (with student + course)
-router.get('/enrollments', (req, res) => {
-  const semester = getSettings().semester;
-  const rows = db
-    .prepare(
-      `SELECT e.id, e.status, e.created_at, u.name AS student_name, u.grade, u.class_no, u.student_no,
-              c.title AS course_title, c.category, c.id AS course_id
-       FROM enrollments e JOIN users u ON u.id=e.student_id JOIN courses c ON c.id=e.course_id
-       WHERE c.semester = ? AND e.status != 'cancelled'
-       ORDER BY e.created_at DESC`
-    )
-    .all(semester);
+router.get('/enrollments', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  const rows = await all(
+    `SELECT e.id, e.status, e.created_at, u.name AS student_name, u.grade, u.class_no, u.student_no,
+            c.title AS course_title, c.category, c.id AS course_id
+     FROM enrollments e JOIN users u ON u.id=e.student_id JOIN courses c ON c.id=e.course_id
+     WHERE c.semester = ? AND e.status != 'cancelled'
+     ORDER BY e.created_at DESC`,
+    [semester]
+  );
   res.json({ enrollments: rows });
-});
+}));
 
 export default router;

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import db from '../db.js';
-import { verifyPassword, signToken, hashPassword, authRequired } from '../auth.js';
+import { get, run } from '../db.js';
+import { verifyPassword, signToken, hashPassword, authRequired, ah } from '../auth.js';
 import { publicUser } from '../logic.js';
 
 const router = Router();
@@ -12,12 +12,12 @@ const loginSchema = z.object({
   role: z.enum(['admin', 'teacher', 'student']).optional(),
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', ah(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '아이디와 비밀번호를 입력하세요.' });
   const { username, password, role } = parsed.data;
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  const user = await get('SELECT * FROM users WHERE username = ?', [username]);
   if (!user || !verifyPassword(password, user.password_hash)) {
     return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
   }
@@ -34,36 +34,36 @@ router.post('/login', (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
   res.json({ token, user: publicUser(user) });
-});
+}));
 
 router.post('/logout', (req, res) => {
   res.clearCookie('token');
   res.json({ ok: true });
 });
 
-router.get('/me', authRequired, (req, res) => {
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+router.get('/me', authRequired, ah(async (req, res) => {
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   res.json({ user: publicUser(user) });
-});
+}));
 
 // Change own password
 const pwSchema = z.object({
   current: z.string().min(1),
   next: z.string().min(4),
 });
-router.post('/change-password', authRequired, (req, res) => {
+router.post('/change-password', authRequired, ah(async (req, res) => {
   const parsed = pwSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '새 비밀번호는 4자 이상이어야 합니다.' });
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
   if (!verifyPassword(parsed.data.current, user.password_hash)) {
     return res.status(400).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
   }
-  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(
+  await run('UPDATE users SET password_hash = ? WHERE id = ?', [
     hashPassword(parsed.data.next),
-    user.id
-  );
+    user.id,
+  ]);
   res.json({ ok: true });
-});
+}));
 
 export default router;

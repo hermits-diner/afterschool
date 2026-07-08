@@ -39,7 +39,7 @@
 | 구분 | 사용 기술 |
 |------|-----------|
 | 프론트엔드 | React 18, TypeScript, Vite, React Router, Tailwind CSS, Lucide 아이콘 |
-| 백엔드 | Node.js, Express, better-sqlite3 (SQLite) |
+| 백엔드 | Node.js, Express, libSQL(@libsql/client) — 로컬 SQLite 파일 또는 Turso |
 | 인증 | JWT (jsonwebtoken), bcryptjs 비밀번호 해시 |
 | 검증 | Zod |
 
@@ -63,6 +63,19 @@ npm run dev
 npm run build   # 프론트엔드 빌드 (client/dist)
 npm start       # 백엔드가 빌드된 프론트엔드까지 제공 → http://localhost:4000
 ```
+
+### 영구 DB (Turso) 연결 — 선택
+
+환경변수 없이 실행하면 로컬 SQLite 파일(서버리스에서는 `/tmp`, 휘발성)을 사용합니다.
+[Turso](https://turso.tech) 무료 DB를 연결하면 데이터가 영구 보존됩니다:
+
+```bash
+TURSO_DATABASE_URL=libsql://<db-name>-<org>.turso.io
+TURSO_AUTH_TOKEN=<token>
+```
+
+Vercel에서는 프로젝트 **Settings → Environment Variables**에 위 두 값을 추가하고 재배포하면 됩니다.
+최초 접속 시 스키마 생성과 데모 데이터 시드가 자동으로 실행됩니다.
 
 ## 👤 데모 계정
 

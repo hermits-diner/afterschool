@@ -1,12 +1,12 @@
-import db, { getSetting } from './db.js';
+import { all, get, run, getSetting } from './db.js';
 
 // Count active (enrolled) students for a course.
-export function enrolledCount(courseId) {
-  return db
-    .prepare(
-      "SELECT COUNT(*) AS c FROM enrollments WHERE course_id = ? AND status = 'enrolled'"
-    )
-    .get(courseId).c;
+export async function enrolledCount(courseId) {
+  const row = await get(
+    "SELECT COUNT(*) AS c FROM enrollments WHERE course_id = ? AND status = 'enrolled'",
+    [courseId]
+  );
+  return row.c;
 }
 
 // Parse 'HH:MM' -> minutes for overlap checks.
@@ -20,14 +20,13 @@ export function timeOverlap(aStart, aEnd, bStart, bEnd) {
 }
 
 // Return the course that conflicts with `course` in the student's active schedule, or null.
-export function findScheduleConflict(studentId, course) {
-  const rows = db
-    .prepare(
-      `SELECT c.* FROM enrollments e
-       JOIN courses c ON c.id = e.course_id
-       WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ?`
-    )
-    .all(studentId, course.id);
+export async function findScheduleConflict(studentId, course) {
+  const rows = await all(
+    `SELECT c.* FROM enrollments e
+     JOIN courses c ON c.id = e.course_id
+     WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ?`,
+    [studentId, course.id]
+  );
   for (const other of rows) {
     if (
       other.day_of_week === course.day_of_week &&
@@ -39,10 +38,10 @@ export function findScheduleConflict(studentId, course) {
   return null;
 }
 
-export function isRegistrationOpen() {
-  if (getSetting('registration_open') !== 'true') return false;
-  const start = getSetting('registration_start');
-  const end = getSetting('registration_end');
+export async function isRegistrationOpen() {
+  if ((await getSetting('registration_open')) !== 'true') return false;
+  const start = await getSetting('registration_start');
+  const end = await getSetting('registration_end');
   const today = new Date().toISOString().slice(0, 10);
   if (start && today < start) return false;
   if (end && today > end) return false;
@@ -50,17 +49,16 @@ export function isRegistrationOpen() {
 }
 
 // When a seat frees up, promote the earliest waitlisted student to enrolled.
-export function promoteWaitlist(courseId) {
-  const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(courseId);
+export async function promoteWaitlist(courseId) {
+  const course = await get('SELECT * FROM courses WHERE id = ?', [courseId]);
   if (!course) return;
-  while (enrolledCount(courseId) < course.capacity) {
-    const next = db
-      .prepare(
-        "SELECT * FROM enrollments WHERE course_id = ? AND status = 'waitlisted' ORDER BY created_at ASC, id ASC LIMIT 1"
-      )
-      .get(courseId);
+  while ((await enrolledCount(courseId)) < course.capacity) {
+    const next = await get(
+      "SELECT * FROM enrollments WHERE course_id = ? AND status = 'waitlisted' ORDER BY created_at ASC, id ASC LIMIT 1",
+      [courseId]
+    );
     if (!next) break;
-    db.prepare("UPDATE enrollments SET status = 'enrolled' WHERE id = ?").run(next.id);
+    await run("UPDATE enrollments SET status = 'enrolled' WHERE id = ?", [next.id]);
   }
 }
 
@@ -83,38 +81,61 @@ export function publicUser(u) {
 
 // Active roster (enrolled first, then waitlisted) for a course.
 // orderBy 'student': 학년/반/번호 순 — class lists. 'created': 신청순 — 대기 순번 확인용.
-export function getCourseRoster(courseId, orderBy = 'student') {
+export async function getCourseRoster(courseId, orderBy = 'student') {
   const order =
     orderBy === 'created' ? 'e.created_at, e.id' : 'u.grade, u.class_no, u.student_no';
-  return db
-    .prepare(
-      `SELECT e.id AS enrollment_id, e.status, e.created_at,
-              u.id AS student_id, u.name, u.grade, u.class_no, u.student_no, u.phone
-       FROM enrollments e JOIN users u ON u.id = e.student_id
-       WHERE e.course_id = ? AND e.status != 'cancelled'
-       ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, ${order}`
-    )
-    .all(courseId);
+  return all(
+    `SELECT e.id AS enrollment_id, e.status, e.created_at,
+            u.id AS student_id, u.name, u.grade, u.class_no, u.student_no, u.phone
+     FROM enrollments e JOIN users u ON u.id = e.student_id
+     WHERE e.course_id = ? AND e.status != 'cancelled'
+     ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, ${order}`,
+    [courseId]
+  );
 }
 
-// Shape a course row for API responses, adding computed fields.
-export function decorateCourse(course) {
+// Shape course rows for API responses, adding computed fields.
+// Batched: constant number of queries regardless of course count (important on remote DB).
+export async function decorateCourses(courses) {
+  if (!courses.length) return [];
+  const ids = courses.map((c) => c.id);
+  const ph = ids.map(() => '?').join(',');
+
+  const counts = await all(
+    `SELECT course_id, status, COUNT(*) AS c FROM enrollments
+     WHERE course_id IN (${ph}) AND status IN ('enrolled','waitlisted')
+     GROUP BY course_id, status`,
+    ids
+  );
+  const enrolledMap = {};
+  const waitlistedMap = {};
+  for (const r of counts) {
+    (r.status === 'enrolled' ? enrolledMap : waitlistedMap)[r.course_id] = r.c;
+  }
+
+  const teacherIds = [...new Set(courses.map((c) => c.teacher_id).filter(Boolean))];
+  const teachers = teacherIds.length
+    ? await all(
+        `SELECT id, name FROM users WHERE id IN (${teacherIds.map(() => '?').join(',')})`,
+        teacherIds
+      )
+    : [];
+  const teacherMap = Object.fromEntries(teachers.map((t) => [t.id, t.name]));
+
+  return courses.map((course) => {
+    const enrolled = enrolledMap[course.id] || 0;
+    return {
+      ...course,
+      teacher_name: (course.teacher_id && teacherMap[course.teacher_id]) || '미배정',
+      enrolled_count: enrolled,
+      waitlisted_count: waitlistedMap[course.id] || 0,
+      seats_left: Math.max(0, course.capacity - enrolled),
+      is_full: enrolled >= course.capacity,
+    };
+  });
+}
+
+export async function decorateCourse(course) {
   if (!course) return course;
-  const teacher = course.teacher_id
-    ? db.prepare('SELECT id, name FROM users WHERE id = ?').get(course.teacher_id)
-    : null;
-  const enrolled = enrolledCount(course.id);
-  const waitlisted = db
-    .prepare(
-      "SELECT COUNT(*) AS c FROM enrollments WHERE course_id = ? AND status = 'waitlisted'"
-    )
-    .get(course.id).c;
-  return {
-    ...course,
-    teacher_name: teacher ? teacher.name : '미배정',
-    enrolled_count: enrolled,
-    waitlisted_count: waitlisted,
-    seats_left: Math.max(0, course.capacity - enrolled),
-    is_full: enrolled >= course.capacity,
-  };
+  return (await decorateCourses([course]))[0];
 }

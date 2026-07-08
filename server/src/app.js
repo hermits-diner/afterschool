@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 
-import { initSchema } from './db.js';
 import { ensureSeed } from './seed.js';
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
@@ -15,8 +14,13 @@ import teacherRoutes from './routes/teacher.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-initSchema();
-ensureSeed(); // create demo accounts/data on first run
+// Schema + demo seed on first run. A parallel cold-start instance may have
+// seeded already — UNIQUE violations there are harmless, so don't crash on them.
+try {
+  await ensureSeed();
+} catch (e) {
+  console.error('seed skipped:', e.message);
+}
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
