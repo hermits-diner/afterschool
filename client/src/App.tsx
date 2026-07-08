@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { Role } from './lib/api';
 import { Spinner } from './components/ui';
@@ -30,9 +30,14 @@ import StudentPrintTimetable from './pages/student/PrintTimetable';
 
 function RequireRole({ role }: { role: Role }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
+  // 임시 비밀번호 사용자는 변경 완료 전까지 다른 페이지 접근 차단
+  if (user.must_change_password && !location.pathname.endsWith('/settings/password')) {
+    return <Navigate to={`/${user.role}/settings/password`} replace />;
+  }
   return <Outlet />;
 }
 

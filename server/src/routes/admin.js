@@ -120,6 +120,64 @@ router.post('/users', ah(async (req, res) => {
   res.status(201).json({ user: publicUser(user) });
 }));
 
+// Bulk-register students: 학번(학년/반/번호) + 이름 + 임시비밀번호.
+// username = 학번 5자리 (예: 1학년 2반 3번 → '10203'), 첫 로그인 시 비밀번호 변경 강제.
+router.post('/users/bulk', ah(async (req, res) => {
+  const schema = z.object({
+    students: z
+      .array(
+        z.object({
+          grade: z.number().int().min(1).max(3),
+          class_no: z.number().int().min(1).max(99),
+          student_no: z.number().int().min(1).max(99),
+          name: z.string().min(1),
+          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.'),
+        })
+      )
+      .min(1)
+      .max(500),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const created = [];
+  const skipped = [];
+  for (const s of parsed.data.students) {
+    const username = `${s.grade}${pad2(s.class_no)}${pad2(s.student_no)}`;
+    const dupe = await get('SELECT id FROM users WHERE username = ?', [username]);
+    if (dupe) {
+      skipped.push({ username, name: s.name, reason: '이미 존재하는 학번' });
+      continue;
+    }
+    await run(
+      `INSERT INTO users (username, password_hash, role, name, grade, class_no, student_no, must_change_password)
+       VALUES (?, ?, 'student', ?, ?, ?, ?, 1)`,
+      [username, hashPassword(s.password), s.name, s.grade, s.class_no, s.student_no]
+    );
+    created.push({ username, name: s.name });
+  }
+  res.status(201).json({ created, skipped });
+}));
+
+// Bulk-delete users by id (본인 계정은 자동 제외).
+router.post('/users/bulk-delete', ah(async (req, res) => {
+  const schema = z.object({ ids: z.array(z.number().int()).min(1).max(500) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '삭제할 회원을 선택하세요.' });
+  const ids = [...new Set(parsed.data.ids)].filter((id) => id !== req.user.id);
+  if (!ids.length) return res.status(400).json({ error: '삭제할 수 있는 회원이 없습니다.' });
+  const ph = ids.map(() => '?').join(',');
+  await batch([
+    { sql: `DELETE FROM attendance WHERE student_id IN (${ph})`, args: ids },
+    { sql: `DELETE FROM enrollments WHERE student_id IN (${ph})`, args: ids },
+    { sql: `UPDATE announcements SET author_id = NULL WHERE author_id IN (${ph})`, args: ids },
+    { sql: `UPDATE courses SET teacher_id = NULL WHERE teacher_id IN (${ph})`, args: ids },
+    { sql: `DELETE FROM users WHERE id IN (${ph})`, args: ids },
+  ]);
+  res.json({ ok: true, deleted: ids.length });
+}));
+
 router.put('/users/:id', ah(async (req, res) => {
   const existing = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });

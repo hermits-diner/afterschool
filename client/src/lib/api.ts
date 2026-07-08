@@ -12,6 +12,7 @@ export interface User {
   student_no?: number | null;
   subject_area?: string | null;
   active?: boolean;
+  must_change_password?: boolean;
 }
 
 export interface Course {

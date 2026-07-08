@@ -37,7 +37,8 @@ export async function ensureSeed() {
     { username: 'teacher2', name: '이영어', subject_area: '영어' },
     { username: 'teacher3', name: '박수학', subject_area: '수학' },
     { username: 'teacher4', name: '최과학', subject_area: '과학' },
-    { username: 'teacher5', name: '정체육', subject_area: '예체능' },
+    { username: 'teacher5', name: '한사회', subject_area: '사회' },
+    { username: 'teacher6', name: '정체육', subject_area: '체육' },
   ];
   const teacherIds = {};
   for (const t of teacherDefs) {
@@ -72,8 +73,10 @@ export async function ensureSeed() {
     { title: '수학 기초 개념 다지기', category: '수학', teacher: 'teacher3', capacity: 25, day_of_week: '금', start_time: '16:00', end_time: '17:30', room: '203호', target_grade: 1, fee: 0, description: '고1 수학 기초 개념을 탄탄하게 다지는 강좌.' },
     { title: '물리 실험 탐구', category: '과학', teacher: 'teacher4', capacity: 16, day_of_week: '화', start_time: '16:00', end_time: '18:00', room: '물리실', target_grade: 0, fee: 5000, description: '직접 실험하며 배우는 물리 개념. 재료비 포함.' },
     { title: '화학 II 심화', category: '과학', teacher: 'teacher4', capacity: 18, day_of_week: '목', start_time: '16:00', end_time: '17:30', room: '화학실', target_grade: 3, fee: 3000, description: '화학 반응과 평형을 심화 학습합니다.' },
-    { title: '농구 교실', category: '예체능', teacher: 'teacher5', capacity: 20, day_of_week: '수', start_time: '16:30', end_time: '18:00', room: '체육관', target_grade: 0, fee: 0, description: '기초 드리블부터 팀 경기까지. 운동복 지참.' },
-    { title: '방송 댄스', category: '예체능', teacher: 'teacher5', capacity: 15, day_of_week: '금', start_time: '16:30', end_time: '18:00', room: '무용실', target_grade: 0, fee: 0, description: '최신 안무를 배우고 함께 무대를 준비합니다.' },
+    { title: '한국사 능력시험 대비', category: '사회', teacher: 'teacher5', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '204호', target_grade: 0, fee: 0, description: '한국사능력검정시험 심화 대비반. 기출 중심으로 정리합니다.' },
+    { title: '생활과 윤리 논술', category: '사회', teacher: 'teacher5', capacity: 15, day_of_week: '수', start_time: '16:00', end_time: '17:30', room: '204호', target_grade: 2, fee: 0, description: '윤리 쟁점을 논술형으로 훈련합니다.' },
+    { title: '농구 교실', category: '기타', teacher: 'teacher6', capacity: 20, day_of_week: '수', start_time: '16:30', end_time: '18:00', room: '체육관', target_grade: 0, fee: 0, description: '기초 드리블부터 팀 경기까지. 운동복 지참.' },
+    { title: '방송 댄스', category: '기타', teacher: 'teacher6', capacity: 15, day_of_week: '금', start_time: '16:30', end_time: '18:00', room: '무용실', target_grade: 0, fee: 0, description: '최신 안무를 배우고 함께 무대를 준비합니다.' },
   ];
 
   const courseIds = [];
@@ -87,7 +90,7 @@ export async function ensureSeed() {
   }
 
   // Some enrollments in 전학년 courses (single transaction)
-  const generalCourses = courseIds.filter((_, idx) => [3, 6, 8, 9].includes(idx));
+  const generalCourses = courseIds.filter((_, idx) => [3, 6, 8, 10].includes(idx));
   const enrollStmts = [];
   for (let i = 0; i < studentIds.length; i++) {
     enrollStmts.push({
@@ -111,7 +114,7 @@ export async function ensureSeed() {
     },
     {
       sql: 'INSERT INTO announcements (course_id, author_id, title, content) VALUES (?, ?, ?, ?)',
-      args: [courseIds[8], teacherIds['teacher5'], '준비물 안내', '실내용 운동화와 운동복을 반드시 준비해 주세요.'],
+      args: [courseIds[10], teacherIds['teacher6'], '준비물 안내', '실내용 운동화와 운동복을 반드시 준비해 주세요.'],
     },
   ]);
 

@@ -1,4 +1,4 @@
-export const CATEGORIES = ['국어', '영어', '수학', '과학', '예체능', '기타'];
+export const CATEGORIES = ['국어', '영어', '수학', '사회', '과학', '기타'];
 export const DAYS = ['월', '화', '수', '목', '금'];
 export const SEMESTER_LABEL = '2026학년도 1학기 방과후학교';
 
@@ -20,8 +20,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   국어: 'bg-rose-100 text-rose-700',
   영어: 'bg-sky-100 text-sky-700',
   수학: 'bg-violet-100 text-violet-700',
+  사회: 'bg-amber-100 text-amber-700',
   과학: 'bg-emerald-100 text-emerald-700',
-  예체능: 'bg-amber-100 text-amber-700',
   기타: 'bg-slate-100 text-slate-700',
 };
 

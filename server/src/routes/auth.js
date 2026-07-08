@@ -59,7 +59,7 @@ router.post('/change-password', authRequired, ah(async (req, res) => {
   if (!verifyPassword(parsed.data.current, user.password_hash)) {
     return res.status(400).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
   }
-  await run('UPDATE users SET password_hash = ? WHERE id = ?', [
+  await run('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', [
     hashPassword(parsed.data.next),
     user.id,
   ]);

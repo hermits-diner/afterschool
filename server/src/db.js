@@ -60,6 +60,7 @@ const SCHEMA = [
     student_no    INTEGER,
     subject_area  TEXT,
     active        INTEGER NOT NULL DEFAULT 1,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE TABLE IF NOT EXISTS courses (
@@ -128,6 +129,10 @@ export async function initSchema() {
     await client.execute('PRAGMA foreign_keys = ON').catch(() => {});
   }
   await batch(SCHEMA);
+  // Migration for databases created before the column existed.
+  await client
+    .execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
   await batch(
     Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({
       sql: 'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
