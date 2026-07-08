@@ -4,6 +4,14 @@ import bcrypt from 'bcryptjs';
 const JWT_SECRET = process.env.JWT_SECRET || 'afterschool-dev-secret-change-in-prod';
 const TOKEN_TTL = '7d';
 
+// 운영(서버리스) 환경에서 시크릿 미설정은 토큰 위조 위험 — 큰 소리로 경고.
+if (!process.env.JWT_SECRET && process.env.VERCEL) {
+  console.warn(
+    '⚠️  [보안] JWT_SECRET 환경변수가 설정되지 않아 기본 개발용 시크릿을 사용 중입니다. ' +
+      'Vercel → Settings → Environment Variables 에 JWT_SECRET(64자 이상 무작위 문자열)을 반드시 추가하세요.'
+  );
+}
+
 export function hashPassword(plain) {
   return bcrypt.hashSync(plain, 10);
 }

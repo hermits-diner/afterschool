@@ -22,6 +22,19 @@ export async function ensureSeed() {
   const existing = (await get('SELECT COUNT(*) c FROM users')).c;
   if (existing > 0) return; // already seeded
 
+  // 시드 모드: SEED_DEMO=true → 데모 데이터, SEED_DEMO=false → 관리자만.
+  // 미설정 시 로컬 개발은 데모, 서버리스(운영)는 관리자만 생성.
+  const demo = process.env.SEED_DEMO ? process.env.SEED_DEMO === 'true' : !process.env.VERCEL;
+  if (!demo) {
+    console.log('  🔐  초기 관리자 계정 생성 (admin / admin123 — 첫 로그인 시 비밀번호 변경 필요)');
+    await run(
+      `INSERT INTO users (username, password_hash, role, name, must_change_password)
+       VALUES ('admin', ?, 'admin', '방과후 담당자', 1)`,
+      [hashPassword('admin123')]
+    );
+    return;
+  }
+
   console.log('  🌱  데모 데이터를 생성합니다...');
   const semester = await getSetting('semester');
 
