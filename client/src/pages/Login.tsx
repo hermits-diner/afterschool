@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../lib/api';
 import { ApiError } from '../lib/api';
-import { Check, GraduationCap } from 'lucide-react';
+import { Check, GraduationCap, Backpack, Presentation, ShieldCheck } from 'lucide-react';
 
-const ROLES: { key: Role; label: string; desc: string; emoji: string }[] = [
-  { key: 'student', label: '학생', desc: '강좌 조회 및 수강신청', emoji: '🎒' },
-  { key: 'teacher', label: '강사', desc: '수강생·출석 관리', emoji: '👩‍🏫' },
-  { key: 'admin', label: '관리자', desc: '강좌·회원·운영 관리', emoji: '🛠️' },
+const ROLES: { key: Role; label: string; desc: string; icon: typeof Backpack }[] = [
+  { key: 'student', label: '학생', desc: '강좌 조회 및 수강신청', icon: Backpack },
+  { key: 'teacher', label: '강사', desc: '수강생·출석 관리', icon: Presentation },
+  { key: 'admin', label: '관리자', desc: '강좌·회원·운영 관리', icon: ShieldCheck },
 ];
 
 const DEMO: Record<Role, { id: string; pw: string }> = {
@@ -94,14 +94,14 @@ export default function Login() {
                     setRole(r.key);
                     setError('');
                   }}
-                  className={`flex flex-col items-center gap-1 rounded-lg border-2 px-2 py-3 text-center transition ${
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border-2 px-2 py-3 text-center transition ${
                     role === r.key
                       ? 'border-brand-500 bg-brand-50'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <span className="text-xl">{r.emoji}</span>
-                  <span className="text-sm font-semibold text-slate-800">{r.label}</span>
+                  <r.icon size={22} strokeWidth={1.75} className={role === r.key ? 'text-brand-600' : 'text-slate-400'} />
+                  <span className={`text-sm font-semibold ${role === r.key ? 'text-brand-700' : 'text-slate-700'}`}>{r.label}</span>
                 </button>
               ))}
             </div>

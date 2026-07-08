@@ -13,18 +13,29 @@ body,
 }
 
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply bg-slate-50 text-slate-800 antialiased tracking-kr;
+  word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+}
+
+h1,
+h2,
+h3 {
+  @apply tracking-tight;
+}
+
+table {
+  font-variant-numeric: tabular-nums; /* 숫자 열 정렬 */
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-brand-300/70 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:scale-[.98];
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-lift active:scale-[.98];
   }
   .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 active:scale-[.98];
+    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50 active:scale-[.98];
   }
   .btn-danger {
     @apply btn bg-rose-600 text-white shadow-sm hover:bg-rose-700 active:scale-[.98];
@@ -33,16 +44,16 @@ body {
     @apply btn text-slate-600 hover:bg-slate-100 active:scale-[.98];
   }
   .btn-sm {
-    @apply gap-1 px-2.5 py-1 text-xs;
+    @apply gap-1 rounded-lg px-2.5 py-1 text-xs;
   }
   .card {
-    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;
+    @apply rounded-2xl border border-slate-200/70 bg-white shadow-card;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200/70;
+    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200/60;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-slate-700;
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
   }
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
