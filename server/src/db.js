@@ -109,6 +109,12 @@ const SCHEMA = [
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS login_attempts (
+    username     TEXT PRIMARY KEY,
+    fails        INTEGER NOT NULL DEFAULT 0,
+    last_fail    TEXT,
+    locked_until TEXT
+  )`,
   `CREATE TABLE IF NOT EXISTS semesters (
     code        TEXT PRIMARY KEY,          -- '2026-1'
     name        TEXT NOT NULL,             -- '2026학년도 1학기'

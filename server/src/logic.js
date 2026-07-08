@@ -65,16 +65,24 @@ export async function isRegistrationOpen() {
 }
 
 // When a seat frees up, promote the earliest waitlisted student to enrolled.
+// Each promotion is a single conditional UPDATE — capacity check and status
+// change happen atomically, so concurrent cancels/promotes can't overshoot.
 export async function promoteWaitlist(courseId) {
-  const course = await get('SELECT * FROM courses WHERE id = ?', [courseId]);
+  const course = await get('SELECT capacity FROM courses WHERE id = ?', [courseId]);
   if (!course) return;
-  while ((await enrolledCount(courseId)) < course.capacity) {
-    const next = await get(
-      "SELECT * FROM enrollments WHERE course_id = ? AND status = 'waitlisted' ORDER BY created_at ASC, id ASC LIMIT 1",
-      [courseId]
+  let promoted = true;
+  while (promoted) {
+    const r = await run(
+      `UPDATE enrollments SET status = 'enrolled'
+       WHERE id = (
+         SELECT id FROM enrollments
+         WHERE course_id = ? AND status = 'waitlisted'
+         ORDER BY created_at ASC, id ASC LIMIT 1
+       )
+       AND (SELECT COUNT(*) FROM enrollments WHERE course_id = ? AND status = 'enrolled') < ?`,
+      [courseId, courseId, course.capacity]
     );
-    if (!next) break;
-    await run("UPDATE enrollments SET status = 'enrolled' WHERE id = ?", [next.id]);
+    promoted = r.changes > 0;
   }
 }
 

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { all, get, run } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
 import {
-  enrolledCount,
   findScheduleConflict,
   isRegistrationOpen,
   promoteWaitlist,
@@ -82,28 +81,46 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
       .json({ error: `시간표가 겹칩니다: ${conflict.title} (${conflict.day_of_week} ${conflict.start_time})` });
   }
 
-  // seat or waitlist
-  const full = (await enrolledCount(course.id)) >= course.capacity;
-  const status = full ? 'waitlisted' : 'enrolled';
-
+  // Seat claim is atomic: the capacity check lives INSIDE the write statement,
+  // so concurrent requests can never overshoot the capacity (선착순 동시성 보장).
+  const seatGuard = `(SELECT COUNT(*) FROM enrollments WHERE course_id = ? AND status = 'enrolled') < ?`;
+  let claimed;
   if (existing) {
     // revive the cancelled row with a fresh timestamp (선착순 순번 갱신)
-    await run("UPDATE enrollments SET status = ?, created_at = datetime('now') WHERE id = ?", [
-      status,
-      existing.id,
-    ]);
+    claimed =
+      (
+        await run(
+          `UPDATE enrollments SET status = 'enrolled', created_at = datetime('now')
+           WHERE id = ? AND ${seatGuard}`,
+          [existing.id, course.id, course.capacity]
+        )
+      ).changes > 0;
+    if (!claimed) {
+      await run("UPDATE enrollments SET status = 'waitlisted', created_at = datetime('now') WHERE id = ?", [
+        existing.id,
+      ]);
+    }
   } else {
-    await run('INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, ?)', [
-      student.id,
-      course.id,
-      status,
-    ]);
+    claimed =
+      (
+        await run(
+          `INSERT INTO enrollments (student_id, course_id, status)
+           SELECT ?, ?, 'enrolled' WHERE ${seatGuard}`,
+          [student.id, course.id, course.id, course.capacity]
+        )
+      ).changes > 0;
+    if (!claimed) {
+      await run("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'waitlisted')", [
+        student.id,
+        course.id,
+      ]);
+    }
   }
 
   res.status(201).json({
     ok: true,
-    status,
-    message: full ? '정원이 초과되어 대기자로 등록되었습니다.' : '수강신청이 완료되었습니다.',
+    status: claimed ? 'enrolled' : 'waitlisted',
+    message: claimed ? '수강신청이 완료되었습니다.' : '정원이 초과되어 대기자로 등록되었습니다.',
   });
 }));
 

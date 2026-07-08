@@ -22,15 +22,48 @@ const loginSchema = z.object({
   role: z.enum(['admin', 'teacher', 'student']).optional(),
 });
 
+// Brute-force guard: FAIL_WINDOW 내 LOCK_THRESHOLD회 실패 시 LOCK_MINUTES 잠금.
+// DB에 기록하므로 서버리스 인스턴스가 여러 개여도 함께 적용된다.
+const LOCK_THRESHOLD = 5;
+const LOCK_MINUTES = 5;
+const FAIL_WINDOW_MINUTES = 15;
+
+async function recordLoginFail(username, prev) {
+  const now = Date.now();
+  const inWindow = prev?.last_fail && now - new Date(prev.last_fail).getTime() < FAIL_WINDOW_MINUTES * 60000;
+  const fails = inWindow ? prev.fails + 1 : 1;
+  const lockedUntil = fails >= LOCK_THRESHOLD ? new Date(now + LOCK_MINUTES * 60000).toISOString() : null;
+  await run(
+    `INSERT INTO login_attempts (username, fails, last_fail, locked_until) VALUES (?, ?, ?, ?)
+     ON CONFLICT(username) DO UPDATE SET fails = excluded.fails, last_fail = excluded.last_fail, locked_until = excluded.locked_until`,
+    [username, fails, new Date(now).toISOString(), lockedUntil]
+  );
+  return { fails, locked: !!lockedUntil };
+}
+
 router.post('/login', ah(async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '아이디와 비밀번호를 입력하세요.' });
   const { username, password, role } = parsed.data;
 
+  const attempts = await get('SELECT * FROM login_attempts WHERE username = ?', [username]);
+  if (attempts?.locked_until && new Date(attempts.locked_until).getTime() > Date.now()) {
+    const mins = Math.max(1, Math.ceil((new Date(attempts.locked_until).getTime() - Date.now()) / 60000));
+    return res.status(429).json({ error: `로그인 시도가 너무 많습니다. ${mins}분 후 다시 시도하세요.` });
+  }
+
   const user = await get('SELECT * FROM users WHERE username = ?', [username]);
   if (!user || !verifyPassword(password, user.password_hash)) {
-    return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+    const { fails, locked } = await recordLoginFail(username, attempts);
+    if (locked) {
+      return res.status(429).json({ error: `로그인 ${LOCK_THRESHOLD}회 실패로 ${LOCK_MINUTES}분간 잠금되었습니다.` });
+    }
+    const remaining = LOCK_THRESHOLD - fails;
+    return res.status(401).json({
+      error: `아이디 또는 비밀번호가 올바르지 않습니다.${remaining <= 2 ? ` (남은 시도 ${remaining}회)` : ''}`,
+    });
   }
+  if (attempts) await run('DELETE FROM login_attempts WHERE username = ?', [username]);
   if (!user.active) return res.status(403).json({ error: '비활성화된 계정입니다. 관리자에게 문의하세요.' });
   if (role && user.role !== role) {
     const label = { admin: '관리자', teacher: '강사', student: '학생' }[role];
