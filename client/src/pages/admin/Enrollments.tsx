@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { enrollStatusLabel } from '../../lib/format';
+import { enrollStatusLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 interface Row {
@@ -118,18 +118,14 @@ export default function AdminEnrollments() {
                 {filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-slate-50">
                     <td className="td font-medium">{r.student_name}</td>
-                    <td className="td">{r.grade}학년 {r.class_no}반 {r.student_no}번</td>
+                    <td className="td">{studentLabel(r.grade, r.class_no, r.student_no)}</td>
                     <td className="td">
                       <div className="flex items-center gap-2">
                         <CategoryBadge category={r.category} />
                         {r.course_title}
                       </div>
                     </td>
-                    <td className="td">
-                      <span className={`badge ${r.status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {enrollStatusLabel(r.status)}
-                      </span>
-                    </td>
+                    <td className="td"><EnrollBadge status={r.status} /></td>
                     <td className="td text-slate-500">{r.created_at}</td>
                     <td className="td text-right">
                       <button className="btn-ghost btn-sm text-rose-600" onClick={() => cancel(r)}>취소</button>

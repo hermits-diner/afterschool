@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
+import { studentLabel } from '../../lib/format';
 
 export default function TeacherRoster() {
   const location = useLocation() as any;
@@ -110,7 +111,7 @@ function RosterTable({ title, rows, showContact }: { title: string; rows: any[];
                 <tr key={r.student_id} className="hover:bg-slate-50">
                   <td className="td text-slate-400">{i + 1}</td>
                   <td className="td font-medium">{r.name}</td>
-                  <td className="td">{r.grade}학년 {r.class_no}반 {r.student_no}번</td>
+                  <td className="td">{studentLabel(r.grade, r.class_no, r.student_no)}</td>
                   {showContact && <td className="td text-slate-500">{r.phone || '-'}</td>}
                 </tr>
               ))}

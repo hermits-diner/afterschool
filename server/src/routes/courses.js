@@ -66,6 +66,24 @@ const courseSchema = z.object({
   status: z.enum(['open', 'closed', 'cancelled']).optional(),
 });
 
+// Bindable column values shared by INSERT and UPDATE.
+function courseRow(d) {
+  return {
+    title: d.title,
+    category: d.category,
+    description: d.description ?? '',
+    teacher_id: d.teacher_id ?? null,
+    capacity: d.capacity,
+    day_of_week: d.day_of_week,
+    start_time: d.start_time,
+    end_time: d.end_time,
+    room: d.room ?? '',
+    target_grade: d.target_grade,
+    fee: d.fee,
+    status: d.status,
+  };
+}
+
 // Create course (admin)
 router.post('/', authRequired, requireRole('admin'), (req, res) => {
   const parsed = courseSchema.safeParse(req.body);
@@ -83,10 +101,8 @@ router.post('/', authRequired, requireRole('admin'), (req, res) => {
        VALUES (@title,@category,@description,@teacher_id,@capacity,@day_of_week,@start_time,@end_time,@room,@target_grade,@fee,@semester,@status)`
     )
     .run({
-      ...d,
-      teacher_id: d.teacher_id ?? null,
+      ...courseRow({ ...d, status: d.status || 'open' }),
       semester: d.semester || getSetting('semester'),
-      status: d.status || 'open',
     });
   const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json({ course: decorateCourse(course) });
@@ -107,21 +123,7 @@ router.put('/:id', authRequired, requireRole('admin'), (req, res) => {
      teacher_id=@teacher_id, capacity=@capacity, day_of_week=@day_of_week,
      start_time=@start_time, end_time=@end_time, room=@room, target_grade=@target_grade,
      fee=@fee, status=@status WHERE id=@id`
-  ).run({
-    id: existing.id,
-    title: merged.title,
-    category: merged.category,
-    description: merged.description,
-    teacher_id: merged.teacher_id ?? null,
-    capacity: merged.capacity,
-    day_of_week: merged.day_of_week,
-    start_time: merged.start_time,
-    end_time: merged.end_time,
-    room: merged.room,
-    target_grade: merged.target_grade,
-    fee: merged.fee,
-    status: merged.status,
-  });
+  ).run({ ...courseRow(merged), id: existing.id });
   const course = db.prepare('SELECT * FROM courses WHERE id = ?').get(existing.id);
   res.json({ course: decorateCourse(course) });
 });

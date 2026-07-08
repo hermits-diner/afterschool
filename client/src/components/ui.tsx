@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { categoryColor, courseStatusLabel } from '../lib/format';
+import { categoryColor, courseStatusLabel, enrollStatusLabel } from '../lib/format';
 import { Icons } from './icons';
 
 export function Modal({
@@ -34,6 +34,12 @@ export function Modal({
 
 export function CategoryBadge({ category }: { category: string }) {
   return <span className={`badge ${categoryColor(category)}`}>{category}</span>;
+}
+
+// Enrollment status pill: 수강확정(green) / 대기(amber)
+export function EnrollBadge({ status }: { status?: string }) {
+  const cls = status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+  return <span className={`badge ${cls}`}>{enrollStatusLabel(status)}</span>;
 }
 
 export function StatusBadge({ status }: { status: string }) {

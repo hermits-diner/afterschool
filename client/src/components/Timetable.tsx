@@ -1,7 +1,5 @@
 import { Course } from '../lib/api';
-import { categoryColor } from '../lib/format';
-
-const DAYS = ['월', '화', '수', '목', '금'];
+import { categoryColor, DAYS } from '../lib/format';
 
 function toMin(t: string) {
   const [h, m] = t.split(':').map(Number);

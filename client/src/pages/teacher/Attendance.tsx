@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
+import { studentShort } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 type Status = 'present' | 'absent' | 'late' | 'excused';
@@ -122,7 +123,7 @@ export default function TeacherAttendance() {
                 <div key={s.student_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
                   <span className="w-6 text-sm text-slate-400">{i + 1}</span>
                   <span className="w-24 font-medium text-slate-800">{s.name}</span>
-                  <span className="text-sm text-slate-400">{s.grade}-{s.class_no}-{s.student_no}</span>
+                  <span className="text-sm text-slate-400">{studentShort(s.grade, s.class_no, s.student_no)}</span>
                   <div className="ml-auto flex gap-1">
                     {STATUSES.map((st) => (
                       <button
@@ -165,7 +166,7 @@ export default function TeacherAttendance() {
                   return (
                     <tr key={s.student_id} className="hover:bg-slate-50">
                       <td className="td font-medium">{s.name}</td>
-                      <td className="td">{s.grade}-{s.class_no}-{s.student_no}</td>
+                      <td className="td">{studentShort(s.grade, s.class_no, s.student_no)}</td>
                       <td className="td text-center text-emerald-600">{s.present}</td>
                       <td className="td text-center text-amber-600">{s.late}</td>
                       <td className="td text-center text-rose-600">{s.absent}</td>

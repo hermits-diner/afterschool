@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, User, Role, ApiError } from '../../lib/api';
 import { Modal, Spinner, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { roleLabel } from '../../lib/format';
+import { roleLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 const TABS: { key: Role; label: string }[] = [
@@ -148,7 +148,7 @@ export default function AdminUsers() {
                   <tr key={u.id} className="hover:bg-slate-50">
                     <td className="td font-medium">{u.name}</td>
                     <td className="td text-slate-500">{u.username}</td>
-                    {tab === 'student' && <td className="td">{u.grade}학년 {u.class_no}반 {u.student_no}번</td>}
+                    {tab === 'student' && <td className="td">{studentLabel(u.grade, u.class_no, u.student_no)}</td>}
                     {tab === 'teacher' && <td className="td">{u.subject_area || '-'}</td>}
                     <td className="td text-slate-500">{u.phone || '-'}</td>
                     <td className="td">

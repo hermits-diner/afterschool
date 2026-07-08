@@ -3,8 +3,7 @@ import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import Timetable from '../../components/Timetable';
-
-const DAYS = ['월', '화', '수', '목', '금'];
+import { DAYS } from '../../lib/format';
 
 export default function StudentTimetable() {
   const [mine, setMine] = useState<Course[] | null>(null);

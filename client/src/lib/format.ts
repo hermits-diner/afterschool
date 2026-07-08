@@ -1,5 +1,20 @@
 export const CATEGORIES = ['국어', '영어', '수학', '과학', '예체능', '기타'];
 export const DAYS = ['월', '화', '수', '목', '금'];
+export const SEMESTER_LABEL = '2026학년도 1학기 방과후학교';
+
+// '1학년 2반 3번' — full student number label
+export function studentLabel(grade?: number | null, classNo?: number | null, studentNo?: number | null) {
+  return `${grade}학년 ${classNo}반 ${studentNo}번`;
+}
+
+// '1-2-3' — compact student number
+export function studentShort(grade?: number | null, classNo?: number | null, studentNo?: number | null) {
+  return `${grade}-${classNo}-${studentNo}`;
+}
+
+export function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export const CATEGORY_COLORS: Record<string, string> = {
   국어: 'bg-rose-100 text-rose-700',

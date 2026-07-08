@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, Course, User, ApiError } from '../../lib/api';
-import { Modal, CategoryBadge, StatusBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
+import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { CATEGORIES, DAYS, targetGradeLabel, formatFee } from '../../lib/format';
+import { CATEGORIES, DAYS, targetGradeLabel, formatFee, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 type Form = {
@@ -304,12 +304,8 @@ export default function AdminCourses() {
                   <tr key={r.enrollment_id}>
                     <td className="td">{i + 1}</td>
                     <td className="td font-medium">{r.name}</td>
-                    <td className="td">{r.grade}학년 {r.class_no}반 {r.student_no}번</td>
-                    <td className="td">
-                      <span className={`badge ${r.status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {r.status === 'enrolled' ? '수강확정' : '대기'}
-                      </span>
-                    </td>
+                    <td className="td">{studentLabel(r.grade, r.class_no, r.student_no)}</td>
+                    <td className="td"><EnrollBadge status={r.status} /></td>
                     <td className="td text-right">
                       <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeFromRoster(r.enrollment_id)}>제외</button>
                     </td>

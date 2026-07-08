@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
-import { Stat, Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Stat, Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
 import { formatFee } from '../../lib/format';
@@ -49,9 +49,7 @@ export default function StudentDashboard() {
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-2">
                     <CategoryBadge category={c.category} />
-                    <span className={`badge ${c.enrollment_status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {c.enrollment_status === 'enrolled' ? '수강확정' : '대기'}
-                    </span>
+                    <EnrollBadge status={c.enrollment_status} />
                   </div>
                   <h3 className="truncate font-semibold text-slate-900">{c.title}</h3>
                   <p className="text-sm text-slate-500">

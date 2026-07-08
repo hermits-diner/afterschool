@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import db, { getSetting } from '../db.js';
 import { authRequired, requireRole } from '../auth.js';
-import { decorateCourse } from '../logic.js';
+import { decorateCourse, getCourseRoster } from '../logic.js';
 
 const DAY_INDEX = { 일: 0, 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6 };
 
@@ -64,17 +64,9 @@ router.get('/summary', (req, res) => {
   });
 });
 
-// Roster for one of my courses
+// Roster for one of my courses (학년/반/번호순)
 router.get('/courses/:id/roster', ownedCourse, (req, res) => {
-  const roster = db
-    .prepare(
-      `SELECT u.id AS student_id, u.name, u.grade, u.class_no, u.student_no, u.phone, e.status, e.created_at
-       FROM enrollments e JOIN users u ON u.id = e.student_id
-       WHERE e.course_id = ? AND e.status != 'cancelled'
-       ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, u.grade, u.class_no, u.student_no`
-    )
-    .all(req.course.id);
-  res.json({ course: decorateCourse(req.course), roster });
+  res.json({ course: decorateCourse(req.course), roster: getCourseRoster(req.course.id) });
 });
 
 /* ---------------- Attendance ---------------- */

@@ -2,8 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import db, { getSettings, setSetting } from '../db.js';
 import { authRequired, requireRole, hashPassword } from '../auth.js';
-import { publicUser } from './auth.js';
-import { decorateCourse, promoteWaitlist } from '../logic.js';
+import { publicUser, decorateCourse, promoteWaitlist, getCourseRoster } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -166,17 +165,9 @@ router.delete('/users/:id', (req, res) => {
 });
 
 /* ---------------- Enrollment management ---------------- */
-// Roster for any course
+// Roster for any course (신청순 — 대기 순번 확인용)
 router.get('/courses/:id/roster', (req, res) => {
-  const roster = db
-    .prepare(
-      `SELECT e.id AS enrollment_id, e.status, e.created_at, u.id AS student_id, u.name, u.grade, u.class_no, u.student_no
-       FROM enrollments e JOIN users u ON u.id=e.student_id
-       WHERE e.course_id = ? AND e.status != 'cancelled'
-       ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, e.created_at`
-    )
-    .all(req.params.id);
-  res.json({ roster });
+  res.json({ roster: getCourseRoster(req.params.id, 'created') });
 });
 
 // Force-remove a student from a course (admin)

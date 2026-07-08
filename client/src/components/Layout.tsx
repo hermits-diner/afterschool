@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { roleLabel } from '../lib/format';
+import { roleLabel, SEMESTER_LABEL } from '../lib/format';
 import { Icons } from './icons';
 
 export interface NavItem {
@@ -108,7 +108,7 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
           </button>
           <div className="hidden items-center gap-2 text-sm text-slate-500 lg:flex">
             <Icons.calendar size={16} className="text-slate-400" />
-            2026학년도 1학기 방과후학교
+            {SEMESTER_LABEL}
           </div>
           <div className="flex items-center gap-4">
             <NavLink to="settings/password" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">

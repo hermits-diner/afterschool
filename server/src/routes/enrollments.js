@@ -54,11 +54,13 @@ router.post('/', authRequired, requireRole('student'), (req, res) => {
     return res.status(400).json({ error: `${course.target_grade}학년 대상 강좌입니다.` });
   }
 
-  // already enrolled/waitlisted?
+  // already enrolled/waitlisted? (cancelled rows are revived below — UNIQUE constraint)
   const existing = db
-    .prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ? AND status != 'cancelled'")
+    .prepare('SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?')
     .get(student.id, course.id);
-  if (existing) return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
+  if (existing && existing.status !== 'cancelled') {
+    return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
+  }
 
   // max courses limit
   const max = Number(getSetting('max_courses_per_student') || 3);
@@ -83,14 +85,11 @@ router.post('/', authRequired, requireRole('student'), (req, res) => {
   const full = enrolledCount(course.id) >= course.capacity;
   const status = full ? 'waitlisted' : 'enrolled';
 
-  // Revive a previously cancelled enrollment if present (UNIQUE constraint)
-  const cancelled = db
-    .prepare("SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?")
-    .get(student.id, course.id);
-  if (cancelled) {
+  if (existing) {
+    // revive the cancelled row with a fresh timestamp (선착순 순번 갱신)
     db.prepare("UPDATE enrollments SET status = ?, created_at = datetime('now') WHERE id = ?").run(
       status,
-      cancelled.id
+      existing.id
     );
   } else {
     db.prepare('INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, ?)').run(

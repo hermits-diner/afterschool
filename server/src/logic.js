@@ -64,6 +64,39 @@ export function promoteWaitlist(courseId) {
   }
 }
 
+// Serialize a user row for API responses (drops password hash).
+export function publicUser(u) {
+  return {
+    id: u.id,
+    username: u.username,
+    role: u.role,
+    name: u.name,
+    email: u.email,
+    phone: u.phone,
+    grade: u.grade,
+    class_no: u.class_no,
+    student_no: u.student_no,
+    subject_area: u.subject_area,
+    active: !!u.active,
+  };
+}
+
+// Active roster (enrolled first, then waitlisted) for a course.
+// orderBy 'student': 학년/반/번호 순 — class lists. 'created': 신청순 — 대기 순번 확인용.
+export function getCourseRoster(courseId, orderBy = 'student') {
+  const order =
+    orderBy === 'created' ? 'e.created_at, e.id' : 'u.grade, u.class_no, u.student_no';
+  return db
+    .prepare(
+      `SELECT e.id AS enrollment_id, e.status, e.created_at,
+              u.id AS student_id, u.name, u.grade, u.class_no, u.student_no, u.phone
+       FROM enrollments e JOIN users u ON u.id = e.student_id
+       WHERE e.course_id = ? AND e.status != 'cancelled'
+       ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, ${order}`
+    )
+    .all(courseId);
+}
+
 // Shape a course row for API responses, adding computed fields.
 export function decorateCourse(course) {
   if (!course) return course;

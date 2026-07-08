@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, Course, ApiError } from '../../lib/api';
-import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
-import { formatFee, enrollStatusLabel } from '../../lib/format';
+import { Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
+import { formatFee } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 export default function StudentMyCourses() {
@@ -69,11 +69,7 @@ export default function StudentMyCourses() {
                       <td className="td">{c.teacher_name}</td>
                       <td className="td whitespace-nowrap">{c.day_of_week} {c.start_time}~{c.end_time}</td>
                       <td className="td">{formatFee(c.fee)}</td>
-                      <td className="td">
-                        <span className={`badge ${c.enrollment_status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {enrollStatusLabel(c.enrollment_status)}
-                        </span>
-                      </td>
+                      <td className="td"><EnrollBadge status={c.enrollment_status} /></td>
                       <td className="td text-right">
                         <button className="btn-ghost btn-sm text-rose-600" onClick={() => cancel(c)} disabled={busy === c.id}>취소</button>
                       </td>

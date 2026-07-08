@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import db from '../db.js';
 import { verifyPassword, signToken, hashPassword, authRequired } from '../auth.js';
+import { publicUser } from '../logic.js';
 
 const router = Router();
 
@@ -64,21 +65,5 @@ router.post('/change-password', authRequired, (req, res) => {
   );
   res.json({ ok: true });
 });
-
-export function publicUser(u) {
-  return {
-    id: u.id,
-    username: u.username,
-    role: u.role,
-    name: u.name,
-    email: u.email,
-    phone: u.phone,
-    grade: u.grade,
-    class_no: u.class_no,
-    student_no: u.student_no,
-    subject_area: u.subject_area,
-    active: !!u.active,
-  };
-}
 
 export default router;
