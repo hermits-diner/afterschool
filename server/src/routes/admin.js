@@ -43,6 +43,31 @@ router.get('/stats', ah(async (req, res) => {
   res.json({ counts, byCategory, popularCourses: courses });
 }));
 
+/* ---------------- 반별 신청 현황 ---------------- */
+// 학급(학년/반)별 학생 목록 + 각 학생의 신청 강좌 (활성 세션 기준).
+router.get('/class-status', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  const students = await all(
+    "SELECT id, name, grade, class_no, student_no FROM users WHERE role='student' AND active=1 ORDER BY grade, class_no, student_no"
+  );
+  const enrolls = await all(
+    `SELECT e.student_id, e.status, c.title FROM enrollments e JOIN courses c ON c.id = e.course_id
+     WHERE c.semester = ? AND e.status != 'cancelled' ORDER BY c.title`,
+    [semester]
+  );
+  const byStudent = {};
+  for (const e of enrolls) {
+    (byStudent[e.student_id] ||= []).push({ title: e.title, status: e.status });
+  }
+  const classMap = new Map();
+  for (const s of students) {
+    const key = `${s.grade}-${s.class_no}`;
+    if (!classMap.has(key)) classMap.set(key, { grade: s.grade, class_no: s.class_no, students: [] });
+    classMap.get(key).students.push({ ...s, enrollments: byStudent[s.id] || [] });
+  }
+  res.json({ semester, classes: [...classMap.values()] });
+}));
+
 /* ---------------- 교과군 (시간 블록 그룹) ---------------- */
 const groupSlotSchema = z
   .object({

@@ -14,6 +14,8 @@ import AdminUsers from './pages/admin/Users';
 import AdminEnrollments from './pages/admin/Enrollments';
 import AdminSettings from './pages/admin/Settings';
 import AdminFinance from './pages/admin/Finance';
+import AdminClassStatus from './pages/admin/ClassStatus';
+import AdminPrintClassStatus from './pages/admin/PrintClassStatus';
 import AdminPrintEnrollments from './pages/admin/PrintEnrollments';
 import AdminPrintFinance from './pages/admin/PrintFinance';
 
@@ -48,6 +50,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/courses', label: '강좌 관리', icon: <Icons.book /> },
   { to: '/admin/users', label: '회원 관리', icon: <Icons.users /> },
   { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard /> },
+  { to: '/admin/classes', label: '반별 현황', icon: <Icons.users /> },
   { to: '/admin/finance', label: '정산 관리', icon: <Icons.wallet /> },
   { to: '/admin/settings', label: '세션(학기) 관리', icon: <Icons.settings /> },
 ];
@@ -90,11 +93,13 @@ export default function App() {
         {/* Standalone print views (no sidebar) */}
         <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
         <Route path="/admin/print/finance" element={<AdminPrintFinance />} />
+        <Route path="/admin/print/class/:grade/:classNo" element={<AdminPrintClassStatus />} />
         <Route element={<RoleLayout nav={adminNav} />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/courses" element={<AdminCourses />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/enrollments" element={<AdminEnrollments />} />
+          <Route path="/admin/classes" element={<AdminClassStatus />} />
           <Route path="/admin/finance" element={<AdminFinance />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/settings/password" element={<ChangePassword />} />
