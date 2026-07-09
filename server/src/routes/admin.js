@@ -277,6 +277,7 @@ router.put('/finance/calc', ah(async (req, res) => {
     pay_per_session: z.number().int().min(0),  // 차시당 책정강사료
     operating_cost: z.number().int().min(0),   // 수용비
     subsidy: z.number().int().min(0),          // 교육청지원금
+    enroll_total: z.number().int().min(0),     // 학생 개별 수강수의 합 (직접 입력, 자동 집계값은 참고용)
   });
   const schema = z.object({ g12: inputsSchema, g3: inputsSchema });
   const parsed = schema.safeParse(req.body);

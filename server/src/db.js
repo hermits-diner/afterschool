@@ -117,7 +117,7 @@ const SCHEMA = [
   )`,
   `CREATE TABLE IF NOT EXISTS course_groups (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    name      TEXT NOT NULL UNIQUE,           -- 교과군 이름 (예: 'A군')
+    name      TEXT NOT NULL UNIQUE,           -- 교과군 이름 (예: 'A유형')
     schedule  TEXT NOT NULL,                  -- JSON [{day,from,to}] — 비연속 교시/복수 요일 허용
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,

@@ -278,7 +278,7 @@ export default function AdminSettings() {
                 className="input"
                 value={groupForm.name}
                 onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                placeholder="예: A군 (월·수 8~9교시)"
+                placeholder="예: A유형"
                 required
               />
             </div>

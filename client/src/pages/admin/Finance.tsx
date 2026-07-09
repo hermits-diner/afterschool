@@ -35,6 +35,7 @@ export interface CalcInputs {
   pay_per_session: number;  // 차시당 책정강사료
   operating_cost: number;   // 수용비
   subsidy: number;          // 교육청지원금
+  enroll_total: number;     // 학생 개별 수강수의 합 (직접 입력, 자동 집계값은 기본값)
 }
 
 // 교육청 지원액이 학년군별로 달라 1·2학년/3학년을 분리해 계산한다.
@@ -62,10 +63,10 @@ const won = (n: number) => `${n.toLocaleString()}원`;
 export const calcTotalFee = (c: CalcInputs) =>
   c.total_sessions * c.course_count * c.pay_per_session + c.operating_cost;
 // 1과목 수강료 = (총수강료 − 교육청지원금) ÷ 학생 개별 수강수의 합
-export const calcPerCourseFee = (c: CalcInputs, enrollTotal: number) =>
-  enrollTotal > 0 ? Math.round((calcTotalFee(c) - c.subsidy) / enrollTotal) : 0;
+export const calcPerCourseFee = (c: CalcInputs) =>
+  c.enroll_total > 0 ? Math.round((calcTotalFee(c) - c.subsidy) / c.enroll_total) : 0;
 
-const emptyCalc: CalcInputs = { total_sessions: 0, course_count: 0, pay_per_session: 0, operating_cost: 0, subsidy: 0 };
+const emptyCalc: CalcInputs = { total_sessions: 0, course_count: 0, pay_per_session: 0, operating_cost: 0, subsidy: 0, enroll_total: 0 };
 const CALC_GROUPS: { key: CalcGroupKey; label: string }[] = [
   { key: 'g12', label: '1·2학년' },
   { key: 'g3', label: '3학년' },
@@ -82,7 +83,11 @@ export default function AdminFinance() {
   async function load() {
     const r = await api.get<FinanceData>('/admin/finance');
     setData(r);
-    setCalc({ g12: r.calc?.g12 ?? emptyCalc, g3: r.calc?.g3 ?? emptyCalc });
+    // 수강수의 합은 자동 집계값을 기본으로 채우고, 저장된 입력값이 있으면 그 값이 우선한다.
+    setCalc({
+      g12: { ...emptyCalc, enroll_total: r.enrollTotals.g12, ...r.calc?.g12 },
+      g3: { ...emptyCalc, enroll_total: r.enrollTotals.g3, ...r.calc?.g3 },
+    });
   }
   useEffect(() => {
     load();
@@ -169,7 +174,7 @@ export default function AdminFinance() {
             <b>총수강료 = (총차시 × 총강좌수 × 차시당 책정강사료) + 수용비</b> ·{' '}
             <b>1과목 수강료 = (총수강료 − 교육청지원금) ÷ 학생 개별 수강수의 합</b>
             <br />교육청 지원액이 학년군별로 달라 따로 계산합니다. 입력값은 세션별로 저장되며,
-            수강수의 합은 해당 학년 학생의 수강확정 건수에서 자동 집계됩니다.
+            수강수의 합은 직접 입력할 수 있습니다 (해당 학년 수강확정 건수가 기본값으로 채워집니다).
           </p>
         </div>
         <button className="btn-primary" onClick={saveCalc} disabled={calcSaving}>
@@ -179,18 +184,12 @@ export default function AdminFinance() {
       <div className="grid gap-4 xl:grid-cols-2">
         {CALC_GROUPS.map(({ key, label }) => {
           const c = calc[key];
-          const enrollTotal = data.enrollTotals[key];
+          const autoTotal = data.enrollTotals[key];
           const set = (patch: Partial<CalcInputs>) => setCalc({ ...calc, [key]: { ...c, ...patch } });
           return (
             <div key={key} className="card p-5">
-              <h3 className="mb-3 font-bold text-slate-800">
-                {label}
-                <span className="ml-2 text-sm font-normal text-slate-500">
-                  수강수의 합 <b className="text-slate-700">{enrollTotal}건</b>
-                  <span className="ml-1 text-xs text-slate-400">(수강확정 자동 집계)</span>
-                </span>
-              </h3>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <h3 className="mb-3 font-bold text-slate-800">{label}</h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div>
                   <label className="label">총차시</label>
                   <input
@@ -226,6 +225,25 @@ export default function AdminFinance() {
                     onChange={(e) => set({ subsidy: Number(e.target.value) })}
                   />
                 </div>
+                <div>
+                  <label className="label">수강수의 합(건)</label>
+                  <input
+                    type="number" min={0} className="input" value={c.enroll_total}
+                    onChange={(e) => set({ enroll_total: Number(e.target.value) })}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    수강확정 자동 집계 {autoTotal}건
+                    {c.enroll_total !== autoTotal && (
+                      <button
+                        type="button"
+                        className="ml-1.5 text-brand-600 hover:underline"
+                        onClick={() => set({ enroll_total: autoTotal })}
+                      >
+                        자동값 적용
+                      </button>
+                    )}
+                  </p>
+                </div>
               </div>
               <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-4 py-3 text-sm">
                 <div className="text-slate-500">
@@ -236,13 +254,13 @@ export default function AdminFinance() {
                 </div>
                 <div className="text-slate-500">
                   1과목 수강료{' '}
-                  {enrollTotal > 0 ? (
-                    <b className="ml-1 text-base text-brand-700">{won(calcPerCourseFee(c, enrollTotal))}</b>
+                  {c.enroll_total > 0 ? (
+                    <b className="ml-1 text-base text-brand-700">{won(calcPerCourseFee(c))}</b>
                   ) : (
-                    <span className="ml-1 text-xs text-amber-600">수강확정 인원이 없어 계산할 수 없습니다</span>
+                    <span className="ml-1 text-xs text-amber-600">수강수의 합을 입력하면 계산됩니다</span>
                   )}
                   <span className="ml-1.5 text-xs text-slate-400">
-                    = ({won(calcTotalFee(c))} − {won(c.subsidy)}) ÷ {enrollTotal}
+                    = ({won(calcTotalFee(c))} − {won(c.subsidy)}) ÷ {c.enroll_total}
                   </span>
                 </div>
               </div>
