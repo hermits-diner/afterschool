@@ -37,7 +37,7 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
         </span>
         <div>
           <div className="text-base font-bold leading-tight">방과후학교</div>
-          <div className="text-[11px] text-white/60">수강신청 시스템</div>
+          <div className="text-[11px] text-white/60">온라인 수강신청 시스템</div>
         </div>
       </div>
       <div className="mx-4 mb-5 flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 ring-1 ring-white/10">

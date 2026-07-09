@@ -29,7 +29,7 @@ export async function ensureSeed() {
     console.log('  🔐  초기 관리자 계정 생성 (admin / admin123 — 첫 로그인 시 비밀번호 변경 필요)');
     await run(
       `INSERT INTO users (username, password_hash, role, name, must_change_password, is_super)
-       VALUES ('admin', ?, 'admin', '방과후 담당자', 1, 1)`,
+       VALUES ('admin', ?, 'admin', '방과후학교 담당자', 1, 1)`,
       [hashPassword('admin123')]
     );
     return;
@@ -40,7 +40,7 @@ export async function ensureSeed() {
 
   // Admin (시스템 관리자)
   await insertUser({
-    username: 'admin', hash: hashPassword('admin123'), role: 'admin', name: '방과후 담당자',
+    username: 'admin', hash: hashPassword('admin123'), role: 'admin', name: '방과후학교 담당자',
     email: 'admin@school.hs.kr', phone: '02-000-0000',
   });
   await run("UPDATE users SET is_super = 1 WHERE username = 'admin'");

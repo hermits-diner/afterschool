@@ -20,7 +20,7 @@ export default function PrintTimetable() {
   const totalFee = enrolled.reduce((s, c) => s + c.fee, 0);
 
   return (
-    <PrintShell title="방과후 수강 시간표" hint="시간표 미리보기 · 인쇄(Ctrl/⌘+P)" width="lg">
+    <PrintShell title="방과후학교 수강 시간표" hint="시간표 미리보기 · 인쇄(Ctrl/⌘+P)" width="lg">
       <PrintMeta>
         {studentLabel(user?.grade, user?.class_no, user?.student_no)} {user?.name} · 수강 {enrolled.length}과목
       </PrintMeta>

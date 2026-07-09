@@ -100,13 +100,13 @@ export default function StudentCatalog() {
     <div>
       <h1 className="mb-1 text-2xl font-bold text-slate-900">강좌 신청</h1>
       <p className="mb-6 text-sm text-slate-500">
-        원하는 방과후 강좌를 선착순으로 신청하세요. 정원이 차면 신청이 마감됩니다.
+        원하는 방과후학교 강좌를 선착순으로 신청하세요. 정원이 차면 신청이 마감됩니다.
         {user?.grade ? ` (${user.grade}학년 신청 가능 강좌만 표시)` : ''}
       </p>
 
       {locked && (
         <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-          🔒 수강신청이 마감되었습니다. 신청·취소 등 변경이 불가능합니다. 변경이 필요하면 방과후 담당 선생님께 문의하세요.
+          🔒 수강신청이 마감되었습니다. 신청·취소 등 변경이 불가능합니다. 변경이 필요하면 방과후학교 담당 선생님께 문의하세요.
         </div>
       )}
 

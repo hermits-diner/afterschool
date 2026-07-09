@@ -45,7 +45,7 @@ export default function Login() {
             <GraduationCap size={34} />
           </div>
           <h1 className="text-4xl font-bold leading-snug">
-            우리 학교 방과후,
+            우리 학교 방과후학교,
             <br />
             온라인으로 신청하세요
           </h1>
@@ -70,7 +70,7 @@ export default function Login() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white">
               <GraduationCap size={30} />
             </div>
-            <h1 className="mt-3 text-2xl font-bold text-slate-900">방과후학교 수강신청</h1>
+            <h1 className="mt-3 text-2xl font-bold text-slate-900">방과후학교 온라인 수강신청</h1>
           </div>
 
           <div className="card p-8">
@@ -141,7 +141,7 @@ export default function Login() {
           </div>
 
           <p className="mt-5 text-center text-sm text-slate-400">
-            © 2026 방과후학교 수강신청 시스템
+            © 2026 방과후학교 온라인 수강신청 시스템
           </p>
         </div>
       </div>

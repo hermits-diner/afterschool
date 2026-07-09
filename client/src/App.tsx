@@ -19,6 +19,7 @@ import AdminCancelled from './pages/admin/Cancelled';
 import AdminPrintClassStatus from './pages/admin/PrintClassStatus';
 import AdminPrintCancelled from './pages/admin/PrintCancelled';
 import AdminPrintEnrollments from './pages/admin/PrintEnrollments';
+import AdminPrintCourseCatalog from './pages/admin/PrintCourseCatalog';
 import AdminPrintFinance from './pages/admin/PrintFinance';
 
 import TeacherDashboard from './pages/teacher/Dashboard';
@@ -98,6 +99,7 @@ export default function App() {
       <Route element={<RequireRole role="admin" />}>
         {/* Standalone print views (no sidebar) */}
         <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
+        <Route path="/admin/print/catalog" element={<AdminPrintCourseCatalog />} />
         <Route path="/admin/print/finance" element={<AdminPrintFinance />} />
         <Route path="/admin/print/class/:grade/:classNo" element={<AdminPrintClassStatus />} />
         <Route path="/admin/print/cancelled/:grade/:classNo" element={<AdminPrintCancelled />} />

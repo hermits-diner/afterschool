@@ -90,12 +90,12 @@ export default function TeacherCourses() {
     }
     setSaving(true);
     try {
+      // 강의실은 개설 확정 후 관리자가 배정 — 강사 저장 시에는 보내지 않는다 (기존 배정 유지)
       const payload: any = {
         title: form.title,
         category: form.category,
         description: form.description,
         capacity: form.capacity,
-        room: form.room,
         target_grades: form.target_grades,
       };
       if (groups.length > 0) {
@@ -238,7 +238,7 @@ export default function TeacherCourses() {
             <label className="label">강좌명 *</label>
             <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="label">교과</label>
               <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -246,14 +246,11 @@ export default function TeacherCourses() {
               </select>
             </div>
             <div>
-              <label className="label">강의실</label>
-              <input className="input" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="예: 201호" />
-            </div>
-            <div>
               <label className="label">정원</label>
               <input type="number" min={1} className="input" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
             </div>
           </div>
+          <p className="text-xs text-slate-400">강의실은 강좌 개설이 확정된 후 관리자가 배정합니다.</p>
           <div>
             <label className="label">대상 학년 — 복수 선택 가능</label>
             <GradePicker value={form.target_grades} onChange={(v) => setForm({ ...form, target_grades: v })} />

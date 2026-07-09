@@ -24,7 +24,7 @@ export default function StudentDashboard() {
         {user?.name} 학생, 안녕하세요 👋
       </h1>
       <p className="mb-6 text-sm text-slate-500">
-        {user?.grade}학년 {user?.class_no}반 · 나의 방과후 수강 현황입니다.
+        {user?.grade}학년 {user?.class_no}반 · 나의 방과후학교 수강 현황입니다.
       </p>
 
       <div className="grid grid-cols-2 gap-4">
@@ -39,7 +39,7 @@ export default function StudentDashboard() {
 
       <div className="mt-3">
         {mine.length === 0 ? (
-          <EmptyState message="아직 신청한 강좌가 없습니다." sub="강좌 신청 메뉴에서 원하는 방과후 강좌를 신청해 보세요." />
+          <EmptyState message="아직 신청한 강좌가 없습니다." sub="강좌 신청 메뉴에서 원하는 방과후학교 강좌를 신청해 보세요." />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {mine.map((c) => (

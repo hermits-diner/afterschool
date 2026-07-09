@@ -45,12 +45,12 @@ export default function StudentMyCourses() {
 
       {locked && (
         <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-          🔒 수강신청이 마감되어 취소할 수 없습니다. 변경이 필요하면 방과후 담당 선생님께 문의하세요.
+          🔒 수강신청이 마감되어 취소할 수 없습니다. 변경이 필요하면 방과후학교 담당 선생님께 문의하세요.
         </div>
       )}
 
       {mine.length === 0 ? (
-        <EmptyState message="신청한 강좌가 없습니다." sub="강좌 신청 메뉴에서 방과후 강좌를 신청해 보세요." />
+        <EmptyState message="신청한 강좌가 없습니다." sub="강좌 신청 메뉴에서 방과후학교 강좌를 신청해 보세요." />
       ) : (
         <>
           <div className="card mb-4 overflow-hidden">

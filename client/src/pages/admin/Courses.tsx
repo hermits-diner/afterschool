@@ -3,7 +3,7 @@ import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseF
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
-import { CATEGORIES, targetGradesLabel, formatFee, studentLabel, Slot, scheduleLabel } from '../../lib/format';
+import { CATEGORIES, targetGradesLabel, studentLabel, Slot, scheduleLabel } from '../../lib/format';
 import GradePicker from '../../components/GradePicker';
 import { useToast } from '../../context/ToastContext';
 
@@ -112,7 +112,7 @@ export default function AdminCourses() {
         const parts = (line.includes('\t') ? line.split('\t') : line.split(','))
           .map((p) => p.trim())
           .map((p) => (p === '-' ? '' : p));
-        const [title, teacher, category, group, capacity, grades, fee, payRate] = parts;
+        const [title, teacher, category, group, capacity, grades, payRate] = parts;
         const err = (msg: string) => errors.push(`${idx + 1}행: ${msg}`);
         if (!title) return err('강좌명이 없습니다.');
         if (!group) return err(`'${title}' — 교과군이 없습니다.`);
@@ -134,7 +134,6 @@ export default function AdminCourses() {
           group,
           capacity: num(capacity, '정원'),
           target_grades,
-          fee: num(fee, '수강료'),
           pay_rate: num(payRate, '회당 강사료'),
         });
       });
@@ -324,6 +323,9 @@ export default function AdminCourses() {
               선택 삭제 ({selected.size})
             </button>
           )}
+          <button className="btn-secondary" onClick={() => window.open('/admin/print/catalog', '_blank')}>
+            <Icons.printer size={16} /> 일람표 인쇄
+          </button>
           <button className="btn-secondary" onClick={openTrash}>
             휴지통
           </button>
@@ -352,7 +354,6 @@ export default function AdminCourses() {
                   <th className="th">시간</th>
                   <th className="th">대상</th>
                   <th className="th">정원</th>
-                  <th className="th">수강료</th>
                   <th className="th">상태</th>
                   <th className="th text-right">관리</th>
                 </tr>
@@ -376,6 +377,9 @@ export default function AdminCourses() {
                     </td>
                     <td className="td">{c.teacher_name}</td>
                     <td className="td whitespace-nowrap">
+                      {c.group_name && (
+                        <span className="badge mr-1.5 bg-brand-50 text-brand-700">{c.group_name}</span>
+                      )}
                       {c.schedule_label}
                       {c.room && <span className="text-slate-400"> · {c.room}</span>}
                     </td>
@@ -390,7 +394,6 @@ export default function AdminCourses() {
                         <ProgressBar value={c.enrolled_count} max={c.capacity} />
                       </button>
                     </td>
-                    <td className="td whitespace-nowrap">{formatFee(c.fee)}</td>
                     <td className="td"><StatusBadge status={c.status} /></td>
                     <td className="td">
                       <div className="flex justify-end gap-1">
@@ -514,18 +517,18 @@ export default function AdminCourses() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 강좌씩 <b>강좌명, 강사, 교과, 교과군, 정원, [대상학년], [수강료], [회당강사료]</b> 순서로 입력하세요.
+              한 줄에 한 강좌씩 <b>강좌명, 강사, 교과, 교과군, 정원, [대상학년], [회당강사료]</b> 순서로 입력하세요.
               쉼표 또는 탭(엑셀 붙여넣기) 구분이며, 생략할 항목은 <b>-</b>로 채웁니다.
               <br />강사는 <b>아이디 또는 이름</b>, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b> 적습니다.
               대상학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 비우면 전학년입니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
               <div className="mt-1 font-mono text-xs text-slate-500">
-                문학의 밤, 김국어, 국어, A유형, 20, 12, 30000, 40000<br />
-                방송댄스, -, 기타, B유형, 25 <span className="text-slate-400">← 강사 미배정 · 전학년 · 무료</span>
+                문학의 밤, 김국어, 국어, A유형, 20, 12, 40000<br />
+                방송댄스, -, 기타, B유형, 25 <span className="text-slate-400">← 강사 미배정 · 전학년</span>
               </div>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'문학의 밤, 김국어, 국어, A유형, 20, 12, 30000, 40000\n방송댄스, -, 기타, B유형, 25'}
+              placeholder={'문학의 밤, 김국어, 국어, A유형, 20, 12, 40000\n방송댄스, -, 기타, B유형, 25'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
@@ -598,7 +601,7 @@ export default function AdminCourses() {
               <PeriodPicker value={form.schedule} onChange={(v) => setForm({ ...form, schedule: v })} />
             )}
           </div>
-          <div className="grid gap-4 sm:grid-cols-4">
+          <div className={`grid gap-4 ${editing ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
             <div>
               <label className="label">정원</label>
               <input type="number" min={1} className="input" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
@@ -607,15 +610,37 @@ export default function AdminCourses() {
               <label className="label">대상 학년 — 복수 선택 가능</label>
               <GradePicker value={form.target_grades} onChange={(v) => setForm({ ...form, target_grades: v })} />
             </div>
-            <div>
-              <label className="label">강의실</label>
-              <input className="input" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="예: 201호" />
-            </div>
-            <div>
-              <label className="label">수강료(원)</label>
-              <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
-            </div>
+            {/* 강의실은 개설 확정 후 배정 — 신규 개설 시에는 입력하지 않는다 */}
+            {editing ? (
+              <div>
+                <label className="label">강의실 배정 — 교실 또는 특별실</label>
+                <input
+                  className="input"
+                  list="room-presets"
+                  value={form.room}
+                  onChange={(e) => setForm({ ...form, room: e.target.value })}
+                  placeholder="예: 1-3 교실, 과학실, 컴퓨터실"
+                />
+                {/* 특별실 자동완성 — 직접 입력도 가능 */}
+                <datalist id="room-presets">
+                  <option value="시청각실" />
+                  <option value="과학실" />
+                  <option value="컴퓨터실" />
+                  <option value="음악실" />
+                  <option value="미술실" />
+                  <option value="어학실" />
+                  <option value="도서관" />
+                  <option value="체육관" />
+                  <option value="무용실" />
+                  <option value="가사실" />
+                  <option value="진로활동실" />
+                </datalist>
+              </div>
+            ) : null}
           </div>
+          {!editing && (
+            <p className="text-xs text-slate-400">강의실은 강좌 개설이 확정된 후 이 화면의 [수정]에서 배정할 수 있습니다.</p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="label">계획 차시(총 수업 횟수)</label>
