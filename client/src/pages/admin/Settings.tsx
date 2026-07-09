@@ -39,6 +39,8 @@ export default function AdminSettings() {
   const [groups, setGroups] = useState<CourseGroup[]>([]);
   const [groupForm, setGroupForm] = useState<{ id: number | null; name: string; schedule: Slot[] }>({ id: null, name: '', schedule: [] });
   const [groupSaving, setGroupSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [noticeSaving, setNoticeSaving] = useState(false);
 
   async function load() {
     const r = await api.get<{ semesters: Semester[] }>('/admin/semesters');
@@ -51,7 +53,22 @@ export default function AdminSettings() {
   useEffect(() => {
     load();
     loadGroups();
+    // 현재 랜딩 공지 불러오기 (공개 엔드포인트)
+    api.get<{ notice: string }>('/landing').then((r) => setNotice(r.notice)).catch(() => {});
   }, []);
+
+  // 랜딩(로그인) 화면 공지 저장 — 관리자·부관리자 공통
+  async function saveNotice() {
+    setNoticeSaving(true);
+    try {
+      await api.put('/admin/landing-notice', { text: notice });
+      toast('로그인 화면 공지가 저장되었습니다.', 'success');
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '저장에 실패했습니다.', 'error');
+    } finally {
+      setNoticeSaving(false);
+    }
+  }
 
   /* ---------- 교과군 관리 — 강좌 시간 블록 설정 ---------- */
   async function saveGroup(e: React.FormEvent) {
@@ -248,6 +265,32 @@ export default function AdminSettings() {
       <div className="mt-6 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
         💡 학기가 끝나면: <b>새 세션 생성 → 활성화</b> 후, 지난 세션은 기록 보관용으로 두거나 <b>삭제</b>하면
         해당 학기의 강좌·수강신청·출석·공지 데이터가 한 번에 정리됩니다. (활성 세션은 삭제할 수 없습니다)
+      </div>
+
+      {/* ---------- 로그인 화면 공지 — 수강신청 기간 안내 등 ---------- */}
+      <div className="mt-10 border-t border-slate-200 pt-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-slate-900">로그인 화면 공지</h2>
+          <p className="text-sm text-slate-500">
+            로그인(랜딩) 화면에 표시되는 공지입니다. 활성 세션의 <b>수강신청 기간과 접수 상태는 자동으로 표시</b>되며,
+            여기에는 추가 안내(추가신청 일정, 유의사항 등)를 적습니다. 비워두면 기간 안내만 표시됩니다.
+          </p>
+        </div>
+        <div className="card space-y-3 p-5">
+          <textarea
+            className="input min-h-[100px]"
+            value={notice}
+            onChange={(e) => setNotice(e.target.value)}
+            maxLength={2000}
+            placeholder={'예: 추가 수강신청은 7월 20일(월) 09:00 ~ 7월 22일(수) 17:00입니다.\n문의: 교무실 방과후학교 담당 (☎ 000-0000)'}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">{notice.length}/2000자 · 저장 즉시 로그인 화면에 반영됩니다.</span>
+            <button className="btn-primary" onClick={saveNotice} disabled={noticeSaving}>
+              {noticeSaving ? '저장 중...' : '공지 저장'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* ---------- 교과군 관리 — 시간표 양식으로 교시 블록 설정 ---------- */}

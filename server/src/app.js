@@ -8,7 +8,7 @@ import fs from 'fs';
 import { ensureSeed } from './seed.js';
 import { authRequired, ah } from './auth.js';
 import { getActiveSemester, isRegistrationOpen } from './logic.js';
-import { all } from './db.js';
+import { all, getSetting } from './db.js';
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
 import enrollmentRoutes from './routes/enrollments.js';
@@ -31,6 +31,18 @@ app.use(express.json({ limit: '8mb' })); // 강의계획서(base64, 최대 5MB) 
 app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+
+// 랜딩(로그인) 페이지 공지 — 비로그인 공개. 신청기간·접수상태 + 관리자 공지문.
+app.get('/api/landing', ah(async (req, res) => {
+  const s = await getActiveSemester();
+  res.json({
+    semester: { code: s.code, name: s.name },
+    registration_open: await isRegistrationOpen(),
+    registration_start: s.registration_start || null,
+    registration_end: s.registration_end || null,
+    notice: (await getSetting('landing_notice')) || '',
+  });
+}));
 
 // Active session info for header/print labels + 접수 상태 (학생 화면 마감 표시용).
 app.get('/api/meta', authRequired, ah(async (req, res) => {

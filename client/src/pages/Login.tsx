@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Role } from '../lib/api';
-import { ApiError } from '../lib/api';
+import { api, Role, ApiError } from '../lib/api';
 import { Check, GraduationCap, Backpack, Presentation, ShieldCheck } from 'lucide-react';
+
+// 랜딩 공지 — 비로그인 공개 정보 (신청기간·접수상태·관리자 공지문)
+interface Landing {
+  semester: { code: string; name: string };
+  registration_open: boolean;
+  registration_start: string | null;
+  registration_end: string | null;
+  notice: string;
+}
+
+const fmtDT = (s: string | null) => (s ? s.replace('T', ' ') : '');
 
 const ROLES: { key: Role; label: string; desc: string; icon: typeof Backpack }[] = [
   { key: 'student', label: '학생', desc: '강좌 조회 및 수강신청', icon: Backpack },
@@ -19,6 +29,11 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [landing, setLanding] = useState<Landing | null>(null);
+
+  useEffect(() => {
+    api.get<Landing>('/landing').then(setLanding).catch(() => {});
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +87,26 @@ export default function Login() {
             </div>
             <h1 className="mt-3 text-2xl font-bold text-slate-900">방과후학교 온라인 수강신청</h1>
           </div>
+
+          {/* 공지 — 수강신청 기간·접수 상태 + 관리자 안내문 */}
+          {landing && (landing.registration_start || landing.registration_end || landing.notice) && (
+            <div className="card mb-4 p-5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-800">📢 {landing.semester.name} 수강신청 안내</h3>
+                <span className={`badge shrink-0 ${landing.registration_open ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
+                  {landing.registration_open ? '접수중' : '접수마감'}
+                </span>
+              </div>
+              {(landing.registration_start || landing.registration_end) && (
+                <p className="mt-2 text-sm text-slate-600">
+                  신청 기간: <b className="text-slate-800">{fmtDT(landing.registration_start) || '-'} ~ {fmtDT(landing.registration_end) || '-'}</b>
+                </p>
+              )}
+              {landing.notice && (
+                <p className="mt-2 whitespace-pre-wrap border-t border-slate-100 pt-2 text-sm text-slate-600">{landing.notice}</p>
+              )}
+            </div>
+          )}
 
           <div className="card p-8">
             <h2 className="text-2xl font-bold text-slate-900">로그인</h2>

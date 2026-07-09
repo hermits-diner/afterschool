@@ -427,6 +427,16 @@ router.delete('/semesters/:code', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/* ---------------- 랜딩(로그인) 공지 ---------------- */
+// 관리자·부관리자 모두 수정 가능. 빈 문자열 = 공지 없음.
+router.put('/landing-notice', ah(async (req, res) => {
+  const schema = z.object({ text: z.string().max(2000, '공지는 2000자 이하로 입력하세요.') });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  await setSetting('landing_notice', parsed.data.text.trim());
+  res.json({ ok: true });
+}));
+
 /* ---------------- User management ---------------- */
 router.get('/users', ah(async (req, res) => {
   const { role, q } = req.query;
