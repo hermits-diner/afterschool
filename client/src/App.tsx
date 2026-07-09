@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuth } from './context/AuthContext';
 import { Role } from './lib/api';
 import { Spinner } from './components/ui';
@@ -91,59 +92,62 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<HomeRedirect />} />
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<HomeRedirect />} />
 
-      {/* Admin */}
-      <Route element={<RequireRole role="admin" />}>
-        {/* Standalone print views (no sidebar) */}
-        <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
-        <Route path="/admin/print/catalog" element={<AdminPrintCourseCatalog />} />
-        <Route path="/admin/print/finance" element={<AdminPrintFinance />} />
-        <Route path="/admin/print/class/:grade/:classNo" element={<AdminPrintClassStatus />} />
-        <Route path="/admin/print/cancelled/:grade/:classNo" element={<AdminPrintCancelled />} />
-        <Route element={<RoleLayout nav={adminNav} />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/courses" element={<AdminCourses />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/enrollments" element={<AdminEnrollments />} />
-          <Route path="/admin/classes" element={<AdminClassStatus />} />
-          <Route path="/admin/cancelled" element={<AdminCancelled />} />
-          <Route path="/admin/finance" element={<AdminFinance />} />
-          <Route path="/admin/settings" element={<AdminSettings />} />
-          <Route path="/admin/settings/password" element={<ChangePassword />} />
+        {/* Admin */}
+        <Route element={<RequireRole role="admin" />}>
+          {/* Standalone print views (no sidebar) */}
+          <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
+          <Route path="/admin/print/catalog" element={<AdminPrintCourseCatalog />} />
+          <Route path="/admin/print/finance" element={<AdminPrintFinance />} />
+          <Route path="/admin/print/class/:grade/:classNo" element={<AdminPrintClassStatus />} />
+          <Route path="/admin/print/cancelled/:grade/:classNo" element={<AdminPrintCancelled />} />
+          <Route element={<RoleLayout nav={adminNav} />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/courses" element={<AdminCourses />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/enrollments" element={<AdminEnrollments />} />
+            <Route path="/admin/classes" element={<AdminClassStatus />} />
+            <Route path="/admin/cancelled" element={<AdminCancelled />} />
+            <Route path="/admin/finance" element={<AdminFinance />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/settings/password" element={<ChangePassword />} />
+          </Route>
         </Route>
-      </Route>
 
-      {/* Teacher */}
-      <Route element={<RequireRole role="teacher" />}>
-        {/* Standalone print views (no sidebar) */}
-        <Route path="/teacher/print/roster/:id" element={<PrintRoster />} />
-        <Route path="/teacher/print/attendance/:id" element={<PrintAttendance />} />
-        <Route element={<RoleLayout nav={teacherNav} />}>
-          <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/courses" element={<TeacherCourses />} />
-          <Route path="/teacher/roster" element={<TeacherRoster />} />
-          <Route path="/teacher/attendance" element={<TeacherAttendance />} />
-          <Route path="/teacher/settings/password" element={<ChangePassword />} />
+        {/* Teacher */}
+        <Route element={<RequireRole role="teacher" />}>
+          {/* Standalone print views (no sidebar) */}
+          <Route path="/teacher/print/roster/:id" element={<PrintRoster />} />
+          <Route path="/teacher/print/attendance/:id" element={<PrintAttendance />} />
+          <Route element={<RoleLayout nav={teacherNav} />}>
+            <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="/teacher/courses" element={<TeacherCourses />} />
+            <Route path="/teacher/roster" element={<TeacherRoster />} />
+            <Route path="/teacher/attendance" element={<TeacherAttendance />} />
+            <Route path="/teacher/settings/password" element={<ChangePassword />} />
+          </Route>
         </Route>
-      </Route>
 
-      {/* Student */}
-      <Route element={<RequireRole role="student" />}>
-        {/* Standalone print view (no sidebar) */}
-        <Route path="/student/print/timetable" element={<StudentPrintTimetable />} />
-        <Route element={<RoleLayout nav={studentNav} />}>
-          <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/catalog" element={<StudentCatalog />} />
-          <Route path="/student/my" element={<StudentMyCourses />} />
-          <Route path="/student/timetable" element={<StudentTimetable />} />
-          <Route path="/student/settings/password" element={<ChangePassword />} />
+        {/* Student */}
+        <Route element={<RequireRole role="student" />}>
+          {/* Standalone print view (no sidebar) */}
+          <Route path="/student/print/timetable" element={<StudentPrintTimetable />} />
+          <Route element={<RoleLayout nav={studentNav} />}>
+            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/student/catalog" element={<StudentCatalog />} />
+            <Route path="/student/my" element={<StudentMyCourses />} />
+            <Route path="/student/timetable" element={<StudentTimetable />} />
+            <Route path="/student/settings/password" element={<ChangePassword />} />
+          </Route>
         </Route>
-      </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <SpeedInsights />
+    </>
   );
 }
