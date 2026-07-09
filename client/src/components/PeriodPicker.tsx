@@ -1,43 +1,35 @@
-import { DAYS, PERIODS, periodsFromTimes, periodLabel } from '../lib/format';
+import { DAYS, PERIOD_COUNT, Slot, scheduleLabel } from '../lib/format';
 
-export interface Slot {
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-}
+const PERIOD_NOS = Array.from({ length: PERIOD_COUNT }, (_, i) => i + 1);
 
-// 요일 × 1~9교시 시간표 그리드에서 수업 블록을 선택한다.
-// 클릭: 단일 교시 선택 · 같은 요일에서 다시 클릭: 연속 교시 범위로 확장.
-export default function PeriodPicker({ value, onChange }: { value: Slot; onChange: (v: Slot) => void }) {
-  const range = periodsFromTimes(value.start_time, value.end_time);
-  const [from, to] = range || [0, -1];
+// 요일 × 1~9교시 그리드에서 블록을 자유롭게 토글한다.
+// 떨어져 있는 교시, 복수 요일 조합 모두 가능. 같은 요일의 연속 교시는 자동으로 범위로 묶인다.
+export default function PeriodPicker({ value, onChange }: { value: Slot[]; onChange: (v: Slot[]) => void }) {
+  const isOn = (day: string, no: number) => value.some((s) => s.day === day && no >= s.from && no <= s.to);
 
-  function pick(day: string, no: number) {
-    if (day === value.day_of_week && range) {
-      if (no >= from && no <= to && from !== to) {
-        // 범위 내부 클릭: 그 교시 단일 선택으로 축소
-        const p = PERIODS[no - 1];
-        onChange({ day_of_week: day, start_time: p.start, end_time: p.end });
-        return;
+  function toggle(day: string, no: number) {
+    // 슬롯 → 셀 집합으로 풀고 토글 후 다시 연속 범위로 묶는다
+    const cells = new Set<string>();
+    for (const s of value) for (let p = s.from; p <= s.to; p++) cells.add(`${s.day}:${p}`);
+    const key = `${day}:${no}`;
+    cells.has(key) ? cells.delete(key) : cells.add(key);
+
+    const slots: Slot[] = [];
+    for (const d of DAYS) {
+      const ps = [...cells]
+        .filter((c) => c.startsWith(`${d}:`))
+        .map((c) => Number(c.split(':')[1]))
+        .sort((a, b) => a - b);
+      let i = 0;
+      while (i < ps.length) {
+        let j = i;
+        while (j + 1 < ps.length && ps[j + 1] === ps[j] + 1) j++;
+        slots.push({ day: d, from: ps[i], to: ps[j] });
+        i = j + 1;
       }
-      if (no === from && no === to) return; // 이미 단일 선택된 블록
-      // 같은 요일 바깥쪽 클릭: 클릭한 교시까지 연속 범위로 확장
-      const f = Math.min(from, no);
-      const t = Math.max(to, no);
-      onChange({
-        day_of_week: day,
-        start_time: PERIODS[f - 1].start,
-        end_time: PERIODS[t - 1].end,
-      });
-    } else {
-      // 다른 요일이거나 첫 선택: 단일 교시
-      const p = PERIODS[no - 1];
-      onChange({ day_of_week: day, start_time: p.start, end_time: p.end });
     }
+    onChange(slots);
   }
-
-  const selected = (day: string, no: number) =>
-    day === value.day_of_week && range !== null && no >= from && no <= to;
 
   return (
     <div>
@@ -45,25 +37,23 @@ export default function PeriodPicker({ value, onChange }: { value: Slot; onChang
         <table className="w-full border-collapse text-center text-xs">
           <thead>
             <tr className="bg-slate-50">
-              <th className="w-20 border-b border-r border-slate-200 px-1 py-1.5 font-medium text-slate-500">교시</th>
+              <th className="w-14 border-b border-r border-slate-200 px-1 py-1.5 font-medium text-slate-500">교시</th>
               {DAYS.map((d) => (
                 <th key={d} className="border-b border-slate-200 px-1 py-1.5 font-semibold text-slate-700">{d}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {PERIODS.map((p) => (
-              <tr key={p.no}>
-                <td className="border-r border-t border-slate-100 px-1 py-0.5 text-slate-400">
-                  <b className="text-slate-600">{p.no}</b> <span className="hidden sm:inline">{p.start}</span>
-                </td>
+            {PERIOD_NOS.map((no) => (
+              <tr key={no}>
+                <td className="border-r border-t border-slate-100 px-1 py-0.5 font-semibold text-slate-600">{no}</td>
                 {DAYS.map((d) => (
                   <td key={d} className="border-t border-slate-100 p-0.5">
                     <button
                       type="button"
-                      onClick={() => pick(d, p.no)}
+                      onClick={() => toggle(d, no)}
                       className={`h-7 w-full rounded-md transition ${
-                        selected(d, p.no)
+                        isOn(d, no)
                           ? 'bg-brand-600 text-white shadow-sm'
                           : 'bg-slate-50 text-transparent hover:bg-brand-100'
                       }`}
@@ -78,15 +68,10 @@ export default function PeriodPicker({ value, onChange }: { value: Slot; onChang
         </table>
       </div>
       <p className="mt-1.5 text-sm">
-        {range ? (
-          <span className="font-medium text-brand-700">
-            {value.day_of_week}요일 {periodLabel(from, to)} ({value.start_time} ~ {value.end_time})
-          </span>
+        {value.length ? (
+          <span className="font-medium text-brand-700">{scheduleLabel(value)}</span>
         ) : (
-          <span className="text-slate-400">
-            시간표에서 수업 블록을 선택하세요 · 같은 요일을 한 번 더 클릭하면 연속 교시로 확장됩니다
-            {value.start_time && ` (현재: ${value.day_of_week} ${value.start_time}~${value.end_time})`}
-          </span>
+          <span className="text-slate-400">교시 블록을 클릭해서 선택하세요 (여러 요일·떨어진 교시 선택 가능)</span>
         )}
       </p>
     </div>

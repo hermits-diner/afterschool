@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { api, Course, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
+import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
-import { CATEGORIES, targetGradeLabel, formatFee, studentLabel } from '../../lib/format';
+import { CATEGORIES, targetGradesLabel, formatFee, studentLabel, Slot, scheduleLabel } from '../../lib/format';
+import GradePicker from '../../components/GradePicker';
 import { useToast } from '../../context/ToastContext';
 
 const MAX_FILE = 5 * 1024 * 1024;
@@ -14,11 +15,10 @@ type Form = {
   description: string;
   teacher_id: number | null;
   capacity: number;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
+  group_id: number | null; // null = 직접 지정
+  schedule: Slot[];
   room: string;
-  target_grade: number;
+  target_grades: number[];
   fee: number;
   pay_rate: number;
   planned_sessions: number;
@@ -30,11 +30,10 @@ const emptyForm: Form = {
   description: '',
   teacher_id: null,
   capacity: 20,
-  day_of_week: '월',
-  start_time: '',
-  end_time: '',
+  group_id: null,
+  schedule: [],
   room: '',
-  target_grade: 0,
+  target_grades: [],
   fee: 0,
   pay_rate: 0,
   planned_sessions: 16,
@@ -44,6 +43,10 @@ export default function AdminCourses() {
   const toast = useToast();
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [teachers, setTeachers] = useState<User[]>([]);
+  const [groups, setGroups] = useState<CourseGroup[]>([]);
+  const [groupModal, setGroupModal] = useState(false);
+  const [groupForm, setGroupForm] = useState<{ id: number | null; name: string; schedule: Slot[] }>({ id: null, name: '', schedule: [] });
+  const [groupSaving, setGroupSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
@@ -56,10 +59,46 @@ export default function AdminCourses() {
     const r = await api.get<{ courses: Course[] }>('/courses');
     setCourses(r.courses);
   }
+  async function loadGroups() {
+    const r = await api.get<{ groups: CourseGroup[] }>('/groups');
+    setGroups(r.groups);
+  }
   useEffect(() => {
     load();
+    loadGroups();
     api.get<{ users: User[] }>('/admin/users?role=teacher').then((r) => setTeachers(r.users));
   }, []);
+
+  /* ---------- 교과군 관리 ---------- */
+  async function saveGroup(e: React.FormEvent) {
+    e.preventDefault();
+    if (groupForm.schedule.length === 0) return toast('교시를 하나 이상 선택하세요.', 'error');
+    setGroupSaving(true);
+    try {
+      if (groupForm.id) {
+        await api.put(`/admin/groups/${groupForm.id}`, { name: groupForm.name, schedule: groupForm.schedule });
+        toast('교과군이 수정되었습니다. 소속 강좌 시간도 함께 갱신됩니다.', 'success');
+      } else {
+        await api.post('/admin/groups', { name: groupForm.name, schedule: groupForm.schedule });
+        toast('교과군이 생성되었습니다.', 'success');
+      }
+      setGroupForm({ id: null, name: '', schedule: [] });
+      loadGroups();
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '저장 실패', 'error');
+    } finally {
+      setGroupSaving(false);
+    }
+  }
+
+  async function removeGroup(g: CourseGroup) {
+    if (!confirm(`'${g.name}' 교과군을 삭제하시겠습니까?\n소속 강좌는 현재 시간표를 유지한 채 교과군만 해제됩니다.`)) return;
+    await api.del(`/admin/groups/${g.id}`);
+    toast('교과군이 삭제되었습니다.', 'success');
+    loadGroups();
+    load();
+  }
 
   function openCreate() {
     setEditing(null);
@@ -75,11 +114,10 @@ export default function AdminCourses() {
       description: c.description || '',
       teacher_id: c.teacher_id,
       capacity: c.capacity,
-      day_of_week: c.day_of_week,
-      start_time: c.start_time,
-      end_time: c.end_time,
+      group_id: c.group_id ?? null,
+      schedule: c.schedule || [],
       room: c.room || '',
-      target_grade: c.target_grade,
+      target_grades: c.target_grades || [],
       fee: c.fee,
       pay_rate: c.pay_rate || 0,
       planned_sessions: c.planned_sessions || 0,
@@ -90,17 +128,19 @@ export default function AdminCourses() {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.start_time || !form.end_time) {
-      return toast('시간표에서 수업 교시를 선택하세요.', 'error');
+    if (!form.group_id && form.schedule.length === 0) {
+      return toast('교과군을 선택하거나 시간표에서 교시를 지정하세요.', 'error');
     }
     if (syllabusFile && syllabusFile.size > MAX_FILE) {
       return toast('강의계획서는 5MB 이하 파일만 첨부할 수 있습니다.', 'error');
     }
     setSaving(true);
     try {
+      const { group_id, schedule, ...rest } = form;
+      const payload: any = group_id ? { ...rest, group_id } : { ...rest, schedule };
       const r = editing
-        ? await api.put<{ course: Course }>(`/courses/${editing.id}`, form)
-        : await api.post<{ course: Course }>('/courses', form);
+        ? await api.put<{ course: Course }>(`/courses/${editing.id}`, payload)
+        : await api.post<{ course: Course }>('/courses', payload);
       if (syllabusFile) {
         await api.post(`/courses/${r.course.id}/syllabus`, {
           filename: syllabusFile.name,
@@ -161,9 +201,14 @@ export default function AdminCourses() {
           <h1 className="text-2xl font-bold text-slate-900">강좌 관리</h1>
           <p className="text-sm text-slate-500">강좌는 기본적으로 강사가 개설합니다. 여기서는 미개설 강좌 추가, 정원 조정, 마감/폐강/삭제를 관리합니다.</p>
         </div>
-        <button className="btn-primary" onClick={openCreate}>
-          <Icons.plus size={16} /> 강좌 개설
-        </button>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={() => { setGroupForm({ id: null, name: '', schedule: [] }); setGroupModal(true); }}>
+            <Icons.calendar size={16} /> 교과군 관리
+          </button>
+          <button className="btn-primary" onClick={openCreate}>
+            <Icons.plus size={16} /> 강좌 개설
+          </button>
+        </div>
       </div>
 
       {courses.length === 0 ? (
@@ -195,10 +240,10 @@ export default function AdminCourses() {
                     </td>
                     <td className="td">{c.teacher_name}</td>
                     <td className="td whitespace-nowrap">
-                      {c.day_of_week} {c.start_time}~{c.end_time}
+                      {c.schedule_label}
                       {c.room && <span className="text-slate-400"> · {c.room}</span>}
                     </td>
-                    <td className="td whitespace-nowrap">{targetGradeLabel(c.target_grade)}</td>
+                    <td className="td whitespace-nowrap">{targetGradesLabel(c.target_grades)}</td>
                     <td className="td">
                       <button onClick={() => openRoster(c)} className="group w-24">
                         <div className="mb-1 flex justify-between text-xs">
@@ -265,11 +310,24 @@ export default function AdminCourses() {
             </div>
           </div>
           <div>
-            <label className="label">수업 시간 * — 시간표에서 교시 블록 선택 (학기중 8~9교시 · 방학중 1~4교시)</label>
-            <PeriodPicker
-              value={{ day_of_week: form.day_of_week, start_time: form.start_time, end_time: form.end_time }}
-              onChange={(v) => setForm({ ...form, ...v })}
-            />
+            <label className="label">수업 교시 * — 교과군 선택 또는 직접 지정</label>
+            <select
+              className="input mb-2"
+              value={form.group_id ?? ''}
+              onChange={(e) => setForm({ ...form, group_id: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">직접 지정 (아래 시간표에서 선택)</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name} — {scheduleLabel(g.schedule)}</option>
+              ))}
+            </select>
+            {form.group_id ? (
+              <p className="text-sm font-medium text-brand-700">
+                {scheduleLabel(groups.find((g) => g.id === form.group_id)?.schedule)}
+              </p>
+            ) : (
+              <PeriodPicker value={form.schedule} onChange={(v) => setForm({ ...form, schedule: v })} />
+            )}
           </div>
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
@@ -277,13 +335,8 @@ export default function AdminCourses() {
               <input type="number" min={1} className="input" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: Number(e.target.value) })} />
             </div>
             <div>
-              <label className="label">대상 학년</label>
-              <select className="input" value={form.target_grade} onChange={(e) => setForm({ ...form, target_grade: Number(e.target.value) })}>
-                <option value={0}>전학년</option>
-                <option value={1}>1학년</option>
-                <option value={2}>2학년</option>
-                <option value={3}>3학년</option>
-              </select>
+              <label className="label">대상 학년 — 복수 선택 가능</label>
+              <GradePicker value={form.target_grades} onChange={(v) => setForm({ ...form, target_grades: v })} />
             </div>
             <div>
               <label className="label">강의실</label>

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSetting } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
-import { decorateCourse, decorateCourses, getActiveSemester } from '../logic.js';
+import { decorateCourse, decorateCourses, getActiveSemester, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 
@@ -24,8 +24,8 @@ router.get('/', authRequired, ah(async (req, res) => {
     params.push(day);
   }
   if (grade) {
-    clauses.push('(target_grade = 0 OR target_grade = ?)');
-    params.push(Number(grade));
+    clauses.push("(target_grades IS NULL OR target_grades = '' OR ',' || target_grades || ',' LIKE '%,' || ? || ',%')");
+    params.push(String(Number(grade)));
   }
   if (q) {
     clauses.push('(title LIKE ? OR description LIKE ?)');
@@ -49,23 +49,70 @@ router.get('/:id', authRequired, ah(async (req, res) => {
 }));
 
 const DAYS = ['월', '화', '수', '목', '금'];
+const DAY_ORDER = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4 };
+
+const slotSchema = z
+  .object({
+    day: z.enum(DAYS),
+    from: z.number().int().min(1).max(9),
+    to: z.number().int().min(1).max(9),
+  })
+  .refine((s) => s.from <= s.to, { message: '교시 범위가 올바르지 않습니다.' });
+
 const courseSchema = z.object({
   title: z.string().min(1, '강좌명을 입력하세요.'),
   category: z.string().min(1),
   description: z.string().optional().default(''),
   teacher_id: z.number().int().nullable().optional(),
   capacity: z.number().int().min(1).max(200),
-  day_of_week: z.enum(DAYS),
-  start_time: z.string().regex(/^\d{2}:\d{2}$/),
-  end_time: z.string().regex(/^\d{2}:\d{2}$/),
+  schedule: z.array(slotSchema).max(20).optional(), // 다중 슬롯 직접 지정 (관리자)
+  group_id: z.number().int().nullable().optional(), // 교과군 선택
   room: z.string().optional().default(''),
-  target_grade: z.number().int().min(0).max(3).default(0),
+  target_grade: z.number().int().min(0).max(3).optional(), // 레거시
+  target_grades: z.array(z.number().int().min(1).max(3)).max(3).optional(), // [] 또는 3개 전부 = 전학년
   fee: z.number().int().min(0).default(0),
   pay_rate: z.number().int().min(0).default(0), // 강사료 회당 단가(원) — 관리자만 설정
   planned_sessions: z.number().int().min(0).max(999).default(0), // 계획 차시(총 수업 횟수)
   semester: z.string().optional(),
   status: z.enum(['open', 'closed', 'cancelled']).optional(),
 });
+
+function sortSlots(slots) {
+  return [...slots].sort((a, b) => DAY_ORDER[a.day] - DAY_ORDER[b.day] || a.from - b.from);
+}
+
+// group_id/schedule 입력을 슬롯 배열로 해석. 반환: {slots, group_id} 또는 null(변경 없음).
+async function resolveSchedule(d) {
+  if (d.group_id) {
+    const g = await get('SELECT * FROM course_groups WHERE id = ?', [d.group_id]);
+    if (!g) return { error: '선택한 교과군을 찾을 수 없습니다.' };
+    return { slots: sortSlots(JSON.parse(g.schedule)), group_id: g.id };
+  }
+  if (d.schedule && d.schedule.length) {
+    return { slots: sortSlots(d.schedule), group_id: null };
+  }
+  return null;
+}
+
+// 대상 학년 입력 → 저장 필드. 빈/3개 전부 = 전학년('').
+function gradeFields(list) {
+  const arr = [...new Set(list || [])].sort();
+  const all = arr.length === 0 || arr.length >= 3;
+  return {
+    target_grades: all ? '' : arr.join(','),
+    target_grade: !all && arr.length === 1 ? arr[0] : 0,
+  };
+}
+
+// 슬롯 배열 → 레거시 표시/정렬용 필드 (첫 슬롯 기준)
+function legacyFields(slots) {
+  const first = slots[0];
+  return {
+    day_of_week: first.day,
+    start_time: PERIOD_TIMES[first.from][0],
+    end_time: PERIOD_TIMES[first.to][1],
+  };
+}
 
 // Positional column values shared by INSERT and UPDATE (order matters).
 function courseValues(d) {
@@ -79,15 +126,19 @@ function courseValues(d) {
     d.start_time,
     d.end_time,
     d.room ?? '',
-    d.target_grade,
+    d.target_grade ?? 0,
+    d.target_grades ?? '',
     d.fee,
     d.pay_rate ?? 0,
     d.planned_sessions ?? 0,
+    d.schedule_json ?? null,
+    d.group_id ?? null,
     d.status,
   ];
 }
 
 // Create course — 강사는 자기 강좌를 직접 개설, 관리자는 누구에게든 배정 가능.
+// 수업 시간은 교과군(group_id) 선택 또는 관리자의 직접 슬롯 지정(schedule)으로 결정.
 router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
   const parsed = courseSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -99,16 +150,30 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
     d.pay_rate = 0; // 강사료 단가는 관리자가 책정
     d.fee = 0; // 수강료는 관리자가 책정
     d.planned_sessions = (await getActiveSemester()).default_sessions ?? 16; // 세션 기본 계획 차시 자동 적용
+    // 교과군이 정의되어 있으면 강사는 교과군으로만 시간 지정
+    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups')).c;
+    if (groupCount > 0) {
+      if (!d.group_id) return res.status(400).json({ error: '교과군을 선택하세요.' });
+      delete d.schedule;
+    }
   }
-  if (d.start_time >= d.end_time) {
-    return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
-  }
+  const resolved = await resolveSchedule(d);
+  if (resolved?.error) return res.status(400).json({ error: resolved.error });
+  if (!resolved) return res.status(400).json({ error: '수업 시간(교과군 또는 교시)을 선택하세요.' });
+
   const info = await run(
     `INSERT INTO courses
-     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, pay_rate, planned_sessions, status, semester)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      ...courseValues({ ...d, status: d.status || 'open' }),
+      ...courseValues({
+        ...d,
+        ...legacyFields(resolved.slots),
+        ...gradeFields(d.target_grades ?? (d.target_grade ? [d.target_grade] : [])),
+        schedule_json: JSON.stringify(resolved.slots),
+        group_id: resolved.group_id,
+        status: d.status || 'open',
+      }),
       d.semester || (await getSetting('semester')),
     ]
   );
@@ -125,19 +190,38 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   }
   const parsed = courseSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-  const merged = { ...existing, ...parsed.data };
+  const d = parsed.data;
+  if (req.user.role === 'teacher') {
+    // 교과군이 정의되어 있으면 강사의 직접 슬롯 지정은 무시
+    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups')).c;
+    if (groupCount > 0) delete d.schedule;
+  }
+  const resolved = await resolveSchedule(d);
+  if (resolved?.error) return res.status(400).json({ error: resolved.error });
+
+  const merged = { ...existing, ...d };
+  if (d.target_grades !== undefined) {
+    Object.assign(merged, gradeFields(d.target_grades));
+  } else if (d.target_grade !== undefined) {
+    Object.assign(merged, gradeFields(d.target_grade ? [d.target_grade] : []));
+  }
+  if (resolved) {
+    Object.assign(merged, legacyFields(resolved.slots));
+    merged.schedule_json = JSON.stringify(resolved.slots);
+    merged.group_id = resolved.group_id;
+  } else {
+    merged.schedule_json = existing.schedule;
+    merged.group_id = existing.group_id;
+  }
   if (req.user.role === 'teacher') {
     merged.teacher_id = existing.teacher_id; // 담당 강사 변경은 관리자만
     merged.pay_rate = existing.pay_rate; // 강사료 단가 변경도 관리자만
     merged.fee = existing.fee; // 수강료 변경도 관리자만
     merged.planned_sessions = existing.planned_sessions; // 계획 차시 조정도 관리자만
   }
-  if (merged.start_time >= merged.end_time) {
-    return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
-  }
   await run(
     `UPDATE courses SET title=?, category=?, description=?, teacher_id=?, capacity=?,
-     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, fee=?, pay_rate=?, planned_sessions=?, status=?
+     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, target_grades=?, fee=?, pay_rate=?, planned_sessions=?, schedule=?, group_id=?, status=?
      WHERE id=?`,
     [...courseValues(merged), existing.id]
   );

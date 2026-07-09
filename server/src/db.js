@@ -74,11 +74,14 @@ const SCHEMA = [
     start_time    TEXT NOT NULL,
     end_time      TEXT NOT NULL,
     room          TEXT,
-    target_grade  INTEGER,
+    target_grade  INTEGER,                     -- (레거시) 단일 학년
+    target_grades TEXT,                        -- '1,2' 복수 학년, 빈값/NULL = 전학년
     fee           INTEGER NOT NULL DEFAULT 0,
     pay_rate      INTEGER NOT NULL DEFAULT 0,   -- 강사료 회당 단가(원)
     planned_sessions INTEGER NOT NULL DEFAULT 0, -- 계획 차시(총 수업 횟수) — 정산 기본값
     session_override INTEGER,                   -- 실시 회차 수동 입력값 (최우선)
+    schedule      TEXT,                          -- JSON [{day,from,to}] 다중 슬롯 (비연속 교시 지원)
+    group_id      INTEGER,                       -- 교과군 참조 (course_groups.id)
     semester      TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','cancelled')),
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -111,6 +114,12 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS course_groups (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    name      TEXT NOT NULL UNIQUE,           -- 교과군 이름 (예: 'A군')
+    schedule  TEXT NOT NULL,                  -- JSON [{day,from,to}] — 비연속 교시/복수 요일 허용
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   `CREATE TABLE IF NOT EXISTS course_files (
     course_id   INTEGER PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
@@ -171,6 +180,13 @@ export async function initSchema() {
     .catch(() => {});
   await client
     .execute('ALTER TABLE semesters ADD COLUMN default_sessions INTEGER NOT NULL DEFAULT 16')
+    .catch(() => {});
+  await client.execute('ALTER TABLE courses ADD COLUMN schedule TEXT').catch(() => {});
+  await client.execute('ALTER TABLE courses ADD COLUMN group_id INTEGER').catch(() => {});
+  // 복수 학년 대상: '1,2' 형식, 빈 문자열/NULL = 전학년. 기존 단일 값 이관.
+  await client.execute('ALTER TABLE courses ADD COLUMN target_grades TEXT').catch(() => {});
+  await client
+    .execute("UPDATE courses SET target_grades = CAST(target_grade AS TEXT) WHERE target_grades IS NULL AND target_grade > 0")
     .catch(() => {});
   await batch(
     Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({

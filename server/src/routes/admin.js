@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
-import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester } from '../logic.js';
+import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -41,6 +41,65 @@ router.get('/stats', ah(async (req, res) => {
     .slice(0, 5);
 
   res.json({ counts, byCategory, popularCourses: courses });
+}));
+
+/* ---------------- 교과군 (시간 블록 그룹) ---------------- */
+const groupSlotSchema = z
+  .object({
+    day: z.enum(['월', '화', '수', '목', '금']),
+    from: z.number().int().min(1).max(9),
+    to: z.number().int().min(1).max(9),
+  })
+  .refine((s) => s.from <= s.to, { message: '교시 범위가 올바르지 않습니다.' });
+
+const groupSchema = z.object({
+  name: z.string().min(1, '교과군 이름을 입력하세요.').max(50),
+  schedule: z.array(groupSlotSchema).min(1, '교시를 하나 이상 선택하세요.').max(20),
+});
+
+router.post('/groups', ah(async (req, res) => {
+  const parsed = groupSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const dupe = await get('SELECT id FROM course_groups WHERE name = ?', [parsed.data.name]);
+  if (dupe) return res.status(409).json({ error: '이미 존재하는 교과군 이름입니다.' });
+  const info = await run('INSERT INTO course_groups (name, schedule) VALUES (?, ?)', [
+    parsed.data.name,
+    JSON.stringify(parsed.data.schedule),
+  ]);
+  res.status(201).json({ group: await get('SELECT * FROM course_groups WHERE id = ?', [info.lastInsertRowid]) });
+}));
+
+// 교과군 수정 — 시간 변경 시 소속 강좌들의 시간도 함께 갱신
+router.put('/groups/:id', ah(async (req, res) => {
+  const existing = await get('SELECT * FROM course_groups WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: '교과군을 찾을 수 없습니다.' });
+  const parsed = groupSchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const name = parsed.data.name ?? existing.name;
+  const schedule = parsed.data.schedule ?? JSON.parse(existing.schedule);
+  await run('UPDATE course_groups SET name = ?, schedule = ? WHERE id = ?', [
+    name,
+    JSON.stringify(schedule),
+    existing.id,
+  ]);
+  // 소속 강좌 시간 동기화
+  const first = schedule[0];
+  await run(
+    'UPDATE courses SET schedule = ?, day_of_week = ?, start_time = ?, end_time = ? WHERE group_id = ?',
+    [JSON.stringify(schedule), first.day, PERIOD_TIMES[first.from][0], PERIOD_TIMES[first.to][1], existing.id]
+  );
+  res.json({ group: await get('SELECT * FROM course_groups WHERE id = ?', [existing.id]) });
+}));
+
+// 교과군 삭제 — 소속 강좌는 시간표(schedule 사본)를 유지한 채 그룹 해제
+router.delete('/groups/:id', ah(async (req, res) => {
+  const existing = await get('SELECT * FROM course_groups WHERE id = ?', [req.params.id]);
+  if (!existing) return res.status(404).json({ error: '교과군을 찾을 수 없습니다.' });
+  await batch([
+    { sql: 'UPDATE courses SET group_id = NULL WHERE group_id = ?', args: [existing.id] },
+    { sql: 'DELETE FROM course_groups WHERE id = ?', args: [existing.id] },
+  ]);
+  res.json({ ok: true });
 }));
 
 /* ---------------- Finance (정산) ---------------- */

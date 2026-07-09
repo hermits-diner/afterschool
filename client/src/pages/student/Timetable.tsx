@@ -36,17 +36,20 @@ export default function StudentTimetable() {
           <Timetable courses={enrolled} />
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {DAYS.map((day) => {
-              const dayCourses = enrolled.filter((c) => c.day_of_week === day).sort((a, b) => a.start_time.localeCompare(b.start_time));
+              const dayCourses = enrolled
+                .map((c) => ({ c, slot: (c.schedule || []).find((s) => s.day === day) }))
+                .filter((x) => x.slot)
+                .sort((a, b) => a.slot!.from - b.slot!.from);
               if (dayCourses.length === 0) return null;
               return (
                 <div key={day} className="card p-4">
                   <h3 className="mb-2 font-bold text-slate-700">{day}요일</h3>
                   <div className="space-y-2">
-                    {dayCourses.map((c) => (
+                    {dayCourses.map(({ c, slot }) => (
                       <div key={c.id} className="flex items-center gap-2 text-sm">
                         <CategoryBadge category={c.category} />
                         <span className="font-medium text-slate-800">{c.title}</span>
-                        <span className="ml-auto text-xs text-slate-400">{c.start_time}</span>
+                        <span className="ml-auto text-xs text-slate-400">{slot!.from === slot!.to ? `${slot!.from}교시` : `${slot!.from}~${slot!.to}교시`}</span>
                       </div>
                     ))}
                   </div>

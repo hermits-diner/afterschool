@@ -18,6 +18,62 @@ export async function getActiveSemester() {
   };
 }
 
+// 1~9교시 시간표 (클라이언트 PERIODS와 동일해야 함)
+export const PERIOD_TIMES = {
+  1: ['09:00', '09:50'],
+  2: ['10:00', '10:50'],
+  3: ['11:00', '11:50'],
+  4: ['12:00', '12:50'],
+  5: ['13:30', '14:20'],
+  6: ['14:30', '15:20'],
+  7: ['15:30', '16:20'],
+  8: ['16:30', '17:20'],
+  9: ['17:30', '18:20'],
+};
+
+// 강좌의 수업 슬롯 배열 [{day, from, to}] — schedule JSON 우선, 없으면 null(레거시).
+export function parseSlots(course) {
+  if (course.schedule) {
+    try {
+      const s = typeof course.schedule === 'string' ? JSON.parse(course.schedule) : course.schedule;
+      if (Array.isArray(s) && s.length) return s;
+    } catch {
+      /* legacy */
+    }
+  }
+  return null;
+}
+
+// 강좌를 시간 블록 [{day, start, end}]으로 정규화 (슬롯 또는 레거시 단일 시간).
+export function courseBlocks(course) {
+  const slots = parseSlots(course);
+  if (slots) {
+    return slots.map((s) => ({
+      day: s.day,
+      start: PERIOD_TIMES[s.from][0],
+      end: PERIOD_TIMES[s.to][1],
+    }));
+  }
+  return [{ day: course.day_of_week, start: course.start_time, end: course.end_time }];
+}
+
+// 대상 학년 배열 (빈 배열 = 전학년). target_grades('1,2') 우선, 레거시 target_grade 폴백.
+export function parseTargetGrades(course) {
+  if (course.target_grades !== null && course.target_grades !== undefined) {
+    const arr = String(course.target_grades).split(',').filter(Boolean).map(Number).sort();
+    return arr.length >= 3 ? [] : arr;
+  }
+  return course.target_grade > 0 ? [course.target_grade] : [];
+}
+
+export function scheduleLabel(course) {
+  const slots = parseSlots(course);
+  if (!slots) return `${course.day_of_week} ${course.start_time}~${course.end_time}`;
+  return slots
+    .map((s) => `${s.day} ${s.from === s.to ? `${s.from}교시` : `${s.from}~${s.to}교시`}`)
+    .join(' · ');
+}
+
 // Count active (enrolled) students for a course.
 export async function enrolledCount(courseId) {
   const row = await get(
@@ -37,6 +93,13 @@ export function timeOverlap(aStart, aEnd, bStart, bEnd) {
   return toMin(aStart) < toMin(bEnd) && toMin(bStart) < toMin(aEnd);
 }
 
+// 두 강좌의 수업 블록이 하나라도 겹치는가 (다중 슬롯 지원).
+export function coursesOverlap(a, b) {
+  const ba = courseBlocks(a);
+  const bb = courseBlocks(b);
+  return ba.some((x) => bb.some((y) => x.day === y.day && timeOverlap(x.start, x.end, y.start, y.end)));
+}
+
 // Return the course that conflicts with `course` in the student's active schedule, or null.
 export async function findScheduleConflict(studentId, course) {
   const rows = await all(
@@ -46,12 +109,7 @@ export async function findScheduleConflict(studentId, course) {
     [studentId, course.id]
   );
   for (const other of rows) {
-    if (
-      other.day_of_week === course.day_of_week &&
-      timeOverlap(course.start_time, course.end_time, other.start_time, other.end_time)
-    ) {
-      return other;
-    }
+    if (coursesOverlap(course, other)) return other;
   }
   return null;
 }
@@ -158,6 +216,9 @@ export async function decorateCourses(courses) {
     const enrolled = enrolledMap[course.id] || 0;
     return {
       ...course,
+      schedule: parseSlots(course),
+      schedule_label: scheduleLabel(course),
+      target_grades: parseTargetGrades(course),
       teacher_name: (course.teacher_id && teacherMap[course.teacher_id]) || '미배정',
       enrolled_count: enrolled,
       waitlisted_count: waitlistedMap[course.id] || 0,

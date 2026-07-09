@@ -8,6 +8,7 @@ import fs from 'fs';
 import { ensureSeed } from './seed.js';
 import { authRequired, ah } from './auth.js';
 import { getActiveSemester } from './logic.js';
+import { all } from './db.js';
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
 import enrollmentRoutes from './routes/enrollments.js';
@@ -35,6 +36,14 @@ app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISO
 app.get('/api/meta', authRequired, ah(async (req, res) => {
   const s = await getActiveSemester();
   res.json({ semester: { code: s.code, name: s.name } });
+}));
+
+// 교과군 목록 — 강좌 개설 폼(강사/관리자)에서 사용.
+app.get('/api/groups', authRequired, ah(async (req, res) => {
+  const rows = await all('SELECT * FROM course_groups ORDER BY name');
+  res.json({
+    groups: rows.map((g) => ({ id: g.id, name: g.name, schedule: JSON.parse(g.schedule) })),
+  });
 }));
 
 app.use('/api/auth', authRoutes);

@@ -65,7 +65,7 @@ export default function TeacherRoster() {
                     <CategoryBadge category={course.category} />
                     <span className="font-bold text-slate-800">{course.title}</span>
                   </div>
-                  <span className="text-slate-500">{course.day_of_week} {course.start_time}~{course.end_time}</span>
+                  <span className="text-slate-500">{course.schedule_label}</span>
                   <span className="text-slate-500">{course.room}</span>
                   <span className="font-semibold text-slate-700">수강 {enrolled.length}명 · 대기 {waitlisted.length}명</span>
                   <button

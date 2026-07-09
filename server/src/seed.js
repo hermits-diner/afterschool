@@ -79,7 +79,7 @@ export async function ensureSeed() {
   // Courses
   const courseDefs = [
     { title: '수능 국어 독서 완성', category: '국어', teacher: 'teacher1', capacity: 20, day_of_week: '월', start_time: '16:30', end_time: '18:20', room: '201호', target_grade: 3, fee: 0, description: '비문학 지문 분석과 독해력 향상을 위한 심화 과정입니다.' },
-    { title: '문학 감상과 서술형 대비', category: '국어', teacher: 'teacher1', capacity: 15, day_of_week: '수', start_time: '16:30', end_time: '18:20', room: '201호', target_grade: 2, fee: 0, description: '현대·고전 문학 작품을 감상하고 서술형 평가를 대비합니다.' },
+    { title: '문학 감상과 서술형 대비', category: '국어', teacher: 'teacher1', capacity: 15, day_of_week: '수', start_time: '16:30', end_time: '18:20', room: '201호', target_grade: 0, target_grades: '2,3', fee: 0, description: '현대·고전 문학 작품을 감상하고 서술형 평가를 대비합니다.' },
     { title: '실전 영어 독해 (수능 대비)', category: '영어', teacher: 'teacher2', capacity: 20, day_of_week: '화', start_time: '16:30', end_time: '18:20', room: '202호', target_grade: 3, fee: 0, description: '고난도 영어 지문 독해 전략과 어법을 다룹니다.' },
     { title: '영어 회화 & 발표', category: '영어', teacher: 'teacher2', capacity: 12, day_of_week: '목', start_time: '16:30', end_time: '17:20', room: '어학실', target_grade: 0, fee: 0, description: '원어민 스타일 회화 연습과 영어 발표 훈련.' },
     { title: '미적분 심화 문제풀이', category: '수학', teacher: 'teacher3', capacity: 20, day_of_week: '월', start_time: '16:30', end_time: '18:20', room: '203호', target_grade: 2, fee: 0, description: '미적분 핵심 개념과 킬러 문항 풀이 전략.' },
@@ -94,13 +94,22 @@ export async function ensureSeed() {
 
   const courseIds = [];
   for (const c of courseDefs) {
+    // 시간 → 교시 슬롯 (16:30 시작 = 8교시, 17:20 종료 = 8교시 / 18:20 종료 = 9교시)
+    const slot = { day: c.day_of_week, from: 8, to: c.end_time === '17:20' ? 8 : 9 };
     const info = await run(
-      `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, planned_sessions, semester, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 16, ?, 'open')`,
-      [c.title, c.category, c.description, teacherIds[c.teacher], c.capacity, c.day_of_week, c.start_time, c.end_time, c.room, c.target_grade, c.fee, semester]
+      `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, target_grades, fee, planned_sessions, schedule, semester, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 16, ?, ?, 'open')`,
+      [c.title, c.category, c.description, teacherIds[c.teacher], c.capacity, c.day_of_week, c.start_time, c.end_time, c.room, c.target_grade, c.target_grades ?? (c.target_grade ? String(c.target_grade) : ''), c.fee, JSON.stringify([slot]), semester]
     );
     courseIds.push(info.lastInsertRowid);
   }
+
+  // 데모 교과군 — 관리자가 정의하고 강사는 개설 시 선택
+  await batch([
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['A군 (월·수 8~9교시)', JSON.stringify([{ day: '월', from: 8, to: 9 }, { day: '수', from: 8, to: 9 }])] },
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['B군 (화·목 8~9교시)', JSON.stringify([{ day: '화', from: 8, to: 9 }, { day: '목', from: 8, to: 9 }])] },
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['C군 (금 8~9교시)', JSON.stringify([{ day: '금', from: 8, to: 9 }])] },
+  ]);
 
   // Some enrollments in 전학년 courses (single transaction)
   const generalCourses = courseIds.filter((_, idx) => [3, 6, 8, 10].includes(idx));

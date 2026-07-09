@@ -8,6 +8,8 @@ import {
   promoteWaitlist,
   decorateCourses,
   getActiveSemester,
+  parseTargetGrades,
+  scheduleLabel,
 } from '../logic.js';
 
 const router = Router();
@@ -49,9 +51,10 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
 
   const student = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
 
-  // grade restriction
-  if (course.target_grade !== 0 && course.target_grade !== student.grade) {
-    return res.status(400).json({ error: `${course.target_grade}학년 대상 강좌입니다.` });
+  // grade restriction (복수 학년 지원 — 빈 배열이면 전학년)
+  const targetGrades = parseTargetGrades(course);
+  if (targetGrades.length && !targetGrades.includes(student.grade)) {
+    return res.status(400).json({ error: `${targetGrades.join('·')}학년 대상 강좌입니다.` });
   }
 
   // already enrolled/waitlisted? (cancelled rows are revived below — UNIQUE constraint)
@@ -78,7 +81,7 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
   if (conflict) {
     return res
       .status(400)
-      .json({ error: `시간표가 겹칩니다: ${conflict.title} (${conflict.day_of_week} ${conflict.start_time})` });
+      .json({ error: `시간표가 겹칩니다: ${conflict.title} (${scheduleLabel(conflict)})` });
   }
 
   // Seat claim is atomic: the capacity check lives INSIDE the write statement,

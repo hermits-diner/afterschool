@@ -37,7 +37,7 @@ export default function PrintTimetable() {
             <Th>강좌명</Th>
             <Th w="10%">교과</Th>
             <Th w="13%">강사</Th>
-            <Th w="18%">시간</Th>
+            <Th w="18%">교시</Th>
             <Th w="13%">강의실</Th>
             <Th w="12%">수강료</Th>
           </tr>
@@ -49,7 +49,7 @@ export default function PrintTimetable() {
               <Td>{c.title}</Td>
               <Td center>{c.category}</Td>
               <Td center>{c.teacher_name}</Td>
-              <Td center>{c.day_of_week} {c.start_time}~{c.end_time}</Td>
+              <Td center>{c.schedule_label}</Td>
               <Td center>{c.room || '-'}</Td>
               <Td center>{formatFee(c.fee)}</Td>
             </tr>

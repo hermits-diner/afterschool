@@ -53,7 +53,7 @@ export default function StudentDashboard() {
                   </div>
                   <h3 className="truncate font-semibold text-slate-900">{c.title}</h3>
                   <p className="text-sm text-slate-500">
-                    {c.day_of_week} {c.start_time}~{c.end_time} · {c.room} · {c.teacher_name}
+                    {c.schedule_label} · {c.room} · {c.teacher_name}
                   </p>
                 </div>
               </div>

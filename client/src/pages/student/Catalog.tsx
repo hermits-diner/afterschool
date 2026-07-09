@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
 import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../components/ui';
-import { CATEGORIES, DAYS, targetGradeLabel, formatFee, courseStatusLabel } from '../../lib/format';
+import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { Icons } from '../../components/icons';
@@ -107,12 +107,12 @@ export default function StudentCatalog() {
               <div key={c.id} className="card flex flex-col p-5">
                 <div className="mb-2 flex items-center justify-between">
                   <CategoryBadge category={c.category} />
-                  <span className="text-xs text-slate-400">{targetGradeLabel(c.target_grade)}</span>
+                  <span className="text-xs text-slate-400">{targetGradesLabel(c.target_grades)}</span>
                 </div>
                 <h3 className="mb-1 font-bold text-slate-900">{c.title}</h3>
                 <p className="mb-3 line-clamp-2 flex-1 text-sm text-slate-500">{c.description || '강좌 소개가 없습니다.'}</p>
                 <div className="mb-3 space-y-1.5 text-sm text-slate-600">
-                  <div className="flex items-center gap-2"><Icons.clock size={15} className="text-slate-400" /> {c.day_of_week} {c.start_time}~{c.end_time}</div>
+                  <div className="flex items-center gap-2"><Icons.clock size={15} className="text-slate-400" /> {c.schedule_label}</div>
                   <div className="flex items-center gap-2"><Icons.pin size={15} className="text-slate-400" /> {c.room || '미정'} · {c.teacher_name}</div>
                   <div className="flex items-center gap-2"><Icons.wallet size={15} className="text-slate-400" /> {formatFee(c.fee)}</div>
                 </div>
@@ -149,12 +149,12 @@ export default function StudentCatalog() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <CategoryBadge category={detail.category} />
-              <span className="text-sm text-slate-500">{targetGradeLabel(detail.target_grade)} 대상</span>
+              <span className="text-sm text-slate-500">{targetGradesLabel(detail.target_grades)} 대상</span>
             </div>
             <p className="mb-4 whitespace-pre-wrap text-sm text-slate-600">{detail.description || '강좌 소개가 없습니다.'}</p>
             <dl className="mb-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
               <Row label="담당 강사" value={detail.teacher_name} />
-              <Row label="시간" value={`${detail.day_of_week} ${detail.start_time}~${detail.end_time}`} />
+              <Row label="교시" value={detail.schedule_label || ''} />
               <Row label="강의실" value={detail.room || '미정'} />
               <Row label="수강료" value={formatFee(detail.fee)} />
               <Row label="정원" value={`${detail.enrolled_count} / ${detail.capacity}명`} />

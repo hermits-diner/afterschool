@@ -38,9 +38,19 @@ export interface Course {
   seats_left: number;
   is_full: boolean;
   syllabus_filename?: string | null;
+  schedule?: { day: string; from: number; to: number }[] | null;
+  schedule_label?: string;
+  group_id?: number | null;
+  target_grades?: number[];
   // present on student "mine" responses
   enrollment_id?: number;
   enrollment_status?: 'enrolled' | 'waitlisted' | 'cancelled';
+}
+
+export interface CourseGroup {
+  id: number;
+  name: string;
+  schedule: { day: string; from: number; to: number }[];
 }
 
 const TOKEN_KEY = 'afterschool_token';

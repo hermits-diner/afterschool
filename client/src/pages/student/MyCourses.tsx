@@ -67,7 +67,7 @@ export default function StudentMyCourses() {
                         </div>
                       </td>
                       <td className="td">{c.teacher_name}</td>
-                      <td className="td whitespace-nowrap">{c.day_of_week} {c.start_time}~{c.end_time}</td>
+                      <td className="td whitespace-nowrap">{c.schedule_label}</td>
                       <td className="td">{formatFee(c.fee)}</td>
                       <td className="td"><EnrollBadge status={c.enrollment_status} /></td>
                       <td className="td text-right">

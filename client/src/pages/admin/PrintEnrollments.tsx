@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
-import { targetGradeLabel, enrollStatusLabel, courseStatusLabel, studentLabel } from '../../lib/format';
+import { targetGradesLabel, enrollStatusLabel, courseStatusLabel, studentLabel } from '../../lib/format';
 
 interface Row {
   id: number;
@@ -49,7 +49,7 @@ export default function PrintEnrollments() {
             <Th>강좌명</Th>
             <Th w="9%">교과</Th>
             <Th w="12%">강사</Th>
-            <Th w="16%">시간</Th>
+            <Th w="16%">교시</Th>
             <Th w="9%">대상</Th>
             <Th w="8%">정원</Th>
             <Th w="8%">신청</Th>
@@ -64,8 +64,8 @@ export default function PrintEnrollments() {
               <Td>{c.title}</Td>
               <Td center>{c.category}</Td>
               <Td center>{c.teacher_name}</Td>
-              <Td center>{c.day_of_week} {c.start_time}~{c.end_time}</Td>
-              <Td center>{targetGradeLabel(c.target_grade)}</Td>
+              <Td center>{c.schedule_label}</Td>
+              <Td center>{targetGradesLabel(c.target_grades)}</Td>
               <Td center>{c.capacity}</Td>
               <Td center>{c.enrolled_count}</Td>
               <Td center>{c.waitlisted_count}</Td>

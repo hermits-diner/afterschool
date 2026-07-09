@@ -32,7 +32,7 @@ export default function PrintAttendance() {
         <div className="flex flex-wrap gap-x-6 gap-y-1">
           <span><b className="text-slate-500">강좌</b> {course.title}</span>
           <span><b className="text-slate-500">강사</b> {teacher_name}</span>
-          <span><b className="text-slate-500">시간</b> {course.day_of_week} {course.start_time}~{course.end_time}</span>
+          <span><b className="text-slate-500">교시</b> {course.schedule_label}</span>
           <span><b className="text-slate-500">인원</b> {students.length}명</span>
         </div>
         <span className="text-slate-500">범례: ○출석 △지각 ×결석 공(공결)</span>
