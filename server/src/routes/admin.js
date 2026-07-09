@@ -7,6 +7,12 @@ import { publicUser, decorateCourses, getCourseRoster, getActiveSemester, trashC
 const router = Router();
 router.use(authRequired, requireRole('admin'));
 
+// 요청자가 시스템 관리자인지 — 토큰이 아닌 DB 기준으로 판정 (권한 변경 즉시 반영)
+async function isSuperAdmin(req) {
+  const row = await get('SELECT is_super FROM users WHERE id = ?', [req.user.id]);
+  return !!row?.is_super;
+}
+
 /* ---------------- Dashboard statistics ---------------- */
 router.get('/stats', ah(async (req, res) => {
   const semester = (await getSettings()).semester;
@@ -426,6 +432,10 @@ router.get('/users', ah(async (req, res) => {
   const { role, q } = req.query;
   const clauses = [];
   const params = [];
+  // 부관리자(방과후담당자)에게는 시스템 관리자 계정을 노출하지 않는다.
+  if (!(await isSuperAdmin(req))) {
+    clauses.push('is_super = 0');
+  }
   if (role) {
     clauses.push('role = ?');
     params.push(role);
@@ -459,6 +469,10 @@ router.post('/users', ah(async (req, res) => {
   const parsed = userSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const d = parsed.data;
+  // 관리자(부관리자) 계정 등록은 시스템 관리자만 가능 (신규 관리자는 항상 부관리자로 생성)
+  if (d.role === 'admin' && !(await isSuperAdmin(req))) {
+    return res.status(403).json({ error: '관리자 계정 등록은 시스템 관리자만 할 수 있습니다.' });
+  }
   const dupe = await get('SELECT id FROM users WHERE username = ?', [d.username]);
   if (dupe) return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
   const info = await run(
@@ -569,7 +583,16 @@ router.post('/users/bulk-delete', ah(async (req, res) => {
   const schema = z.object({ ids: z.array(z.number().int()).min(1).max(500) });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '삭제할 회원을 선택하세요.' });
-  const ids = [...new Set(parsed.data.ids)].filter((id) => id !== req.user.id);
+  let ids = [...new Set(parsed.data.ids)].filter((id) => id !== req.user.id);
+  // 시스템 관리자 계정은 일괄 삭제 대상에서 제외
+  if (ids.length) {
+    const superRows = await all(
+      `SELECT id FROM users WHERE is_super = 1 AND id IN (${ids.map(() => '?').join(',')})`,
+      ids
+    );
+    const superIds = new Set(superRows.map((r) => r.id));
+    ids = ids.filter((id) => !superIds.has(id));
+  }
   if (!ids.length) return res.status(400).json({ error: '삭제할 수 있는 회원이 없습니다.' });
   const ph = ids.map(() => '?').join(',');
   await batch([
@@ -585,6 +608,14 @@ router.post('/users/bulk-delete', ah(async (req, res) => {
 router.put('/users/:id', ah(async (req, res) => {
   const existing = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!existing) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  // 부관리자는 시스템 관리자 계정을 볼 수도, 수정할 수도 없다 (존재도 숨김)
+  if (existing.is_super && !(await isSuperAdmin(req))) {
+    return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  }
+  // 시스템 관리자 계정 비활성화 금지 — 시스템 잠금 사고 방지
+  if (existing.is_super && req.body?.active === false) {
+    return res.status(400).json({ error: '시스템 관리자 계정은 비활성화할 수 없습니다.' });
+  }
   const schema = userSchema.partial().extend({ active: z.boolean().optional() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -623,6 +654,11 @@ router.delete('/users/:id', ah(async (req, res) => {
   const user = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
   if (!user) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
   if (user.id === req.user.id) return res.status(400).json({ error: '본인 계정은 삭제할 수 없습니다.' });
+  // 부관리자는 시스템 관리자 계정을 삭제할 수 없다 (존재도 숨김)
+  if (user.is_super && !(await isSuperAdmin(req))) {
+    return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  }
+  if (user.is_super) return res.status(400).json({ error: '시스템 관리자 계정은 삭제할 수 없습니다.' });
   await batch([
     { sql: 'DELETE FROM attendance WHERE student_id = ?', args: [user.id] },
     { sql: 'DELETE FROM enrollments WHERE student_id = ?', args: [user.id] },

@@ -149,6 +149,7 @@ export function publicUser(u) {
     student_no: u.student_no,
     subject_area: u.subject_area,
     active: !!u.active,
+    is_super: !!u.is_super,
     must_change_password: !!u.must_change_password,
   };
 }

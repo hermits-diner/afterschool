@@ -60,6 +60,7 @@ const SCHEMA = [
     student_no    INTEGER,
     subject_area  TEXT,
     active        INTEGER NOT NULL DEFAULT 1,
+    is_super      INTEGER NOT NULL DEFAULT 0,   -- 시스템 관리자(1) / 부관리자·일반(0)
     must_change_password INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
@@ -176,6 +177,17 @@ export async function initSchema() {
   // Migrations for databases created before these columns existed.
   await client
     .execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
+  // 시스템 관리자 구분 — 기존 DB에는 가장 먼저 만들어진 관리자를 시스템 관리자로 승격.
+  await client
+    .execute('ALTER TABLE users ADD COLUMN is_super INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
+  await client
+    .execute(
+      `UPDATE users SET is_super = 1
+       WHERE role = 'admin' AND id = (SELECT MIN(id) FROM users WHERE role = 'admin')
+         AND NOT EXISTS (SELECT 1 FROM users WHERE is_super = 1)`
+    )
     .catch(() => {});
   await client
     .execute('ALTER TABLE courses ADD COLUMN pay_rate INTEGER NOT NULL DEFAULT 0')

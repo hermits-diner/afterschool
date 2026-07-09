@@ -4,6 +4,7 @@ import { Modal, Spinner, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { roleLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 const TABS: { key: Role; label: string }[] = [
   { key: 'student', label: '학생' },
@@ -37,6 +38,8 @@ function parseStudentId(token: string): { grade: number; class_no: number; stude
 
 export default function AdminUsers() {
   const toast = useToast();
+  const { user: me } = useAuth();
+  const isSuper = !!me?.is_super; // 시스템 관리자만 관리자(부관리자) 계정 등록 가능
   const [tab, setTab] = useState<Role>('student');
   const [users, setUsers] = useState<User[] | null>(null);
   const [q, setQ] = useState('');
@@ -240,9 +243,11 @@ export default function AdminUsers() {
               <Icons.users size={16} /> 일괄 등록
             </button>
           )}
-          <button className="btn-primary" onClick={openCreate}>
-            <Icons.plus size={16} /> {roleLabel(tab)} 등록
-          </button>
+          {(tab !== 'admin' || isSuper) && (
+            <button className="btn-primary" onClick={openCreate}>
+              <Icons.plus size={16} /> {tab === 'admin' ? '부관리자 등록' : `${roleLabel(tab)} 등록`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -306,7 +311,14 @@ export default function AdminUsers() {
                         onChange={() => toggleOne(u.id)}
                       />
                     </td>
-                    <td className="td font-medium">{u.name}</td>
+                    <td className="td font-medium">
+                      {u.name}
+                      {tab === 'admin' && (
+                        <span className={`badge ml-2 ${u.is_super ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>
+                          {u.is_super ? '시스템 관리자' : '부관리자'}
+                        </span>
+                      )}
+                    </td>
                     <td className="td text-slate-500">
                       {u.username}
                       {u.must_change_password && (
@@ -324,10 +336,15 @@ export default function AdminUsers() {
                     <td className="td">
                       <div className="flex justify-end gap-1">
                         <button className="btn-ghost btn-sm" onClick={() => openEdit(u)}>수정</button>
-                        <button className="btn-ghost btn-sm text-amber-600" onClick={() => toggleActive(u)}>
-                          {u.active ? '비활성' : '활성'}
-                        </button>
-                        <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(u)}>삭제</button>
+                        {/* 시스템 관리자 계정은 비활성화·삭제 불가 */}
+                        {!u.is_super && (
+                          <>
+                            <button className="btn-ghost btn-sm text-amber-600" onClick={() => toggleActive(u)}>
+                              {u.active ? '비활성' : '활성'}
+                            </button>
+                            <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(u)}>삭제</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

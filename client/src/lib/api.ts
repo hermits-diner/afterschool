@@ -12,6 +12,7 @@ export interface User {
   student_no?: number | null;
   subject_area?: string | null;
   active?: boolean;
+  is_super?: boolean; // 시스템 관리자 (부관리자 관리 권한)
   must_change_password?: boolean;
 }
 
