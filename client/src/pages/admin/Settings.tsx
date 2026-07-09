@@ -221,12 +221,17 @@ export default function AdminSettings() {
       </div>
 
       {/* ---------- 교과군 관리 — 시간표 양식으로 교시 블록 설정 ---------- */}
-      <div className="mt-10">
+      <div className="mt-10 border-t border-slate-200 pt-8">
         <div className="mb-4">
-          <h2 className="text-xl font-bold text-slate-900">교과군 관리</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900">교과군 관리</h2>
+            <span className="badge bg-slate-100 text-slate-500">전역 · 모든 학기 공유</span>
+          </div>
           <p className="text-sm text-slate-500">
             교과군은 강좌들이 공유하는 <b>교시 블록</b>입니다. 강사는 강좌 개설 시 교과군만 선택하면
             수업 시간표가 자동으로 배정되고, 여기서 교과군의 교시를 바꾸면 소속 강좌 시간도 함께 바뀝니다.
+            <br />
+            <b>특정 학기에 속하지 않고 모든 세션이 함께 사용</b>하므로, 세션을 새로 만들 때마다 다시 설정할 필요는 없습니다.
           </p>
         </div>
         <div className="grid gap-5 lg:grid-cols-2">

@@ -249,7 +249,41 @@ router.get('/finance', ah(async (req, res) => {
   };
   totals.net = totals.revenue - totals.teacher_pay;
 
-  res.json({ semester, courses: rows, byTeacher, totals });
+  // 총수강료 계산기 — 학년군(1·2학년/3학년)별 입력값(세션별 저장) + 수강수의 합(수강확정 기준)
+  // 교육청 지원액이 학년군에 따라 다르므로 두 군을 분리해 계산한다.
+  const savedCalc = (await getSettings())[`finance_calc:${semester}`];
+  let calc = savedCalc ? JSON.parse(savedCalc) : null;
+  // 구버전(학년 구분 없는 단일 저장값)은 1·2학년 입력값으로 이관
+  if (calc && calc.total_sessions !== undefined) calc = { g12: calc, g3: null };
+  const enrollTotals = {};
+  for (const [key, cond] of [['g12', 'u.grade IN (1, 2)'], ['g3', 'u.grade = 3']]) {
+    enrollTotals[key] = (await get(
+      `SELECT COUNT(*) c FROM enrollments e
+       JOIN courses c2 ON c2.id = e.course_id
+       JOIN users u ON u.id = e.student_id
+       WHERE c2.semester = ? AND c2.status != 'cancelled' AND e.status = 'enrolled' AND ${cond}`,
+      [semester]
+    )).c;
+  }
+
+  res.json({ semester, courses: rows, byTeacher, totals, calc, enrollTotals });
+}));
+
+// 총수강료 계산기 입력값 저장 — 학년군별 입력을 세션별로 settings에 보관
+router.put('/finance/calc', ah(async (req, res) => {
+  const inputsSchema = z.object({
+    total_sessions: z.number().int().min(0),   // 총차시
+    course_count: z.number().int().min(0),     // 총강좌수
+    pay_per_session: z.number().int().min(0),  // 차시당 책정강사료
+    operating_cost: z.number().int().min(0),   // 수용비
+    subsidy: z.number().int().min(0),          // 교육청지원금
+  });
+  const schema = z.object({ g12: inputsSchema, g3: inputsSchema });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '모든 항목은 0 이상의 숫자여야 합니다.' });
+  const semester = (await getSettings()).semester;
+  await setSetting(`finance_calc:${semester}`, JSON.stringify(parsed.data));
+  res.json({ ok: true, calc: parsed.data });
 }));
 
 // 실시 회차 수동 입력/해제 — count: 숫자면 수동값 저장, null이면 출석부 자동 집계로 복원.

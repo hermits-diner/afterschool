@@ -45,22 +45,19 @@ export default function PrintClassStatus() {
               <thead>
                 <tr className="bg-slate-100">
                   <Th w="8%">번호</Th>
-                  <Th w="14%">이름</Th>
-                  <Th>신청 강좌 (수강확정)</Th>
-                  <Th w="24%">대기</Th>
-                  <Th w="9%">신청 수</Th>
+                  <Th w="16%">이름</Th>
+                  <Th>신청 강좌</Th>
+                  <Th w="10%">신청 수</Th>
                 </tr>
               </thead>
               <tbody>
                 {c.students.map((s) => {
-                  const enrolled = s.enrollments.filter((e) => e.status === 'enrolled').map(enrollmentLabel);
-                  const waitlisted = s.enrollments.filter((e) => e.status === 'waitlisted').map(enrollmentLabel);
+                  const courses = s.enrollments.map(enrollmentLabel);
                   return (
                     <tr key={s.id}>
                       <Td center>{s.student_no}</Td>
                       <Td center>{s.name}</Td>
-                      <Td>{enrolled.length ? enrolled.join(', ') : <b>미신청</b>}</Td>
-                      <Td>{waitlisted.join(', ')}</Td>
+                      <Td>{courses.length ? courses.join(', ') : <b>미신청</b>}</Td>
                       <Td center>{s.enrollments.length}</Td>
                     </tr>
                   );

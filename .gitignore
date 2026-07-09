@@ -24,3 +24,6 @@ server/data.sqlite-wal
 
 # Vercel
 .vercel/
+
+# Claude Code local settings
+.claude/

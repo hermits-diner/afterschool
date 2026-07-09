@@ -131,14 +131,8 @@ export default function AdminClassStatus() {
                           ) : (
                             <div className="flex flex-wrap gap-1">
                               {s.enrollments.map((e, i) => (
-                                <span
-                                  key={i}
-                                  className={`badge ${
-                                    e.status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                  }`}
-                                >
+                                <span key={i} className="badge bg-emerald-100 text-emerald-700">
                                   {enrollmentLabel(e)}
-                                  {e.status === 'waitlisted' && ' (대기)'}
                                 </span>
                               ))}
                             </div>
