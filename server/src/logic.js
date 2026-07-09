@@ -1,4 +1,4 @@
-import { all, get, run, getSetting, semesterName } from './db.js';
+import { all, get, run, batch, getSetting, semesterName } from './db.js';
 
 // Active semester row — settings.semester points at the current session code.
 // Registration window / limits are per-semester settings.
@@ -105,7 +105,7 @@ export async function findScheduleConflict(studentId, course) {
   const rows = await all(
     `SELECT c.* FROM enrollments e
      JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ?`,
+     WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ? AND c.status != 'cancelled'`,
     [studentId, course.id]
   );
   for (const other of rows) {
@@ -188,6 +188,94 @@ export async function getCourseRoster(courseId, orderBy = 'student') {
      ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, ${order}`,
     [courseId]
   );
+}
+
+// 강좌를 휴지통으로 이동 (soft delete). 강좌 행과 하위 데이터(신청·출석·공지·강의계획서)를
+// 통째로 스냅샷에 담아 두므로 복원하면 전부 원상복구된다.
+// (FK cascade 활성 환경에서는 강좌 행 삭제 시 하위 행이 함께 지워지므로 스냅샷이 원본이다)
+export async function trashCourses(ids, deletedBy = null) {
+  if (!ids.length) return 0;
+  const ph = ids.map(() => '?').join(',');
+  const rows = await all(`SELECT * FROM courses WHERE id IN (${ph})`, ids);
+  if (!rows.length) return 0;
+
+  const inserts = [];
+  for (const c of rows) {
+    const bundle = {
+      course: c,
+      enrollments: await all('SELECT * FROM enrollments WHERE course_id = ?', [c.id]),
+      attendance: await all('SELECT * FROM attendance WHERE course_id = ?', [c.id]),
+      announcements: await all('SELECT * FROM announcements WHERE course_id = ?', [c.id]),
+      files: await all('SELECT * FROM course_files WHERE course_id = ?', [c.id]),
+    };
+    inserts.push({
+      sql: `INSERT OR REPLACE INTO courses_trash (id, data, title, semester, deleted_at, deleted_by)
+            VALUES (?, ?, ?, ?, datetime('now'), ?)`,
+      args: [c.id, JSON.stringify(bundle), c.title, c.semester, deletedBy],
+    });
+  }
+  const found = rows.map((c) => c.id);
+  const fph = found.map(() => '?').join(',');
+  await batch([
+    ...inserts,
+    // 하위 데이터는 명시적으로 정리 (FK pragma와 무관하게 일관된 상태 보장)
+    { sql: `DELETE FROM attendance WHERE course_id IN (${fph})`, args: found },
+    { sql: `DELETE FROM announcements WHERE course_id IN (${fph})`, args: found },
+    { sql: `DELETE FROM enrollments WHERE course_id IN (${fph})`, args: found },
+    { sql: `DELETE FROM course_files WHERE course_id IN (${fph})`, args: found },
+    { sql: `DELETE FROM courses WHERE id IN (${fph})`, args: found },
+  ]);
+  return rows.length;
+}
+
+// 휴지통에서 복원 — 강좌와 하위 데이터를 스냅샷에서 되살린다.
+// 삭제 사이에 사라진 학생/강사/교과군 참조 행은 건너뛴다(INSERT OR IGNORE).
+export async function restoreTrashedCourse(id) {
+  const row = await get('SELECT * FROM courses_trash WHERE id = ?', [id]);
+  if (!row) return null;
+  const bundle = JSON.parse(row.data);
+  const d = bundle.course;
+  if (d.teacher_id && !(await get('SELECT id FROM users WHERE id = ?', [d.teacher_id]))) d.teacher_id = null;
+  if (d.group_id && !(await get('SELECT id FROM course_groups WHERE id = ?', [d.group_id]))) d.group_id = null;
+  await batch([
+    {
+      sql: `INSERT INTO courses (id, title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room,
+              target_grade, target_grades, fee, pay_rate, planned_sessions, session_override, schedule, group_id, semester, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        d.id, d.title, d.category, d.description ?? '', d.teacher_id ?? null, d.capacity,
+        d.day_of_week, d.start_time, d.end_time, d.room ?? '', d.target_grade ?? 0, d.target_grades ?? '',
+        d.fee ?? 0, d.pay_rate ?? 0, d.planned_sessions ?? 0, d.session_override ?? null,
+        d.schedule ?? null, d.group_id ?? null, d.semester, d.status ?? 'open', d.created_at,
+      ],
+    },
+    ...(bundle.enrollments || []).map((e) => ({
+      sql: 'INSERT OR IGNORE INTO enrollments (id, student_id, course_id, status, created_at) VALUES (?, ?, ?, ?, ?)',
+      args: [e.id, e.student_id, e.course_id, e.status, e.created_at],
+    })),
+    ...(bundle.attendance || []).map((a) => ({
+      sql: 'INSERT OR IGNORE INTO attendance (id, course_id, student_id, date, status) VALUES (?, ?, ?, ?, ?)',
+      args: [a.id, a.course_id, a.student_id, a.date, a.status],
+    })),
+    ...(bundle.announcements || []).map((a) => ({
+      sql: 'INSERT OR IGNORE INTO announcements (id, course_id, author_id, title, content, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [a.id, a.course_id, a.author_id, a.title, a.content, a.created_at],
+    })),
+    ...(bundle.files || []).map((f) => ({
+      sql: 'INSERT OR IGNORE INTO course_files (course_id, filename, mime, size, data, uploaded_at) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [f.course_id, f.filename, f.mime, f.size, f.data, f.uploaded_at],
+    })),
+    { sql: 'DELETE FROM courses_trash WHERE id = ?', args: [id] },
+  ]);
+  return row.title;
+}
+
+// 휴지통 완전 비우기 — 하위 데이터는 휴지통 이동 시 이미 정리되었으므로 스냅샷만 버린다.
+export async function purgeTrashedCourses(ids) {
+  if (!ids.length) return 0;
+  const ph = ids.map(() => '?').join(',');
+  await run(`DELETE FROM courses_trash WHERE id IN (${ph})`, ids);
+  return ids.length;
 }
 
 // Shape course rows for API responses, adding computed fields.

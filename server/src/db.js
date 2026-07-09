@@ -129,6 +129,14 @@ const SCHEMA = [
     data        TEXT NOT NULL,              -- base64 (강의계획서, 최대 5MB)
     uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS courses_trash (
+    id         INTEGER PRIMARY KEY,        -- 원래 course id (복원 시 그대로 재사용)
+    data       TEXT NOT NULL,              -- 강좌 행 전체 JSON — 복원용 스냅샷
+    title      TEXT NOT NULL,
+    semester   TEXT NOT NULL,
+    deleted_at TEXT NOT NULL DEFAULT (datetime('now')),
+    deleted_by INTEGER
+  )`,
   `CREATE TABLE IF NOT EXISTS login_attempts (
     username     TEXT PRIMARY KEY,
     fails        INTEGER NOT NULL DEFAULT 0,

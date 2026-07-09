@@ -24,6 +24,16 @@ type Form = {
   planned_sessions: number;
 };
 
+type TrashItem = {
+  id: number;
+  title: string;
+  semester: string;
+  category: string;
+  teacher_name: string;
+  enrollment_count: number;
+  deleted_at: string;
+};
+
 // 일괄 등록 한 줄 → 강좌 객체. 강좌명에 공백이 있으므로 탭/쉼표로 구분한다.
 type BulkCourseRow = {
   title: string;
@@ -56,9 +66,6 @@ export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [groups, setGroups] = useState<CourseGroup[]>([]);
-  const [groupModal, setGroupModal] = useState(false);
-  const [groupForm, setGroupForm] = useState<{ id: number | null; name: string; schedule: Slot[] }>({ id: null, name: '', schedule: [] });
-  const [groupSaving, setGroupSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
@@ -70,10 +77,17 @@ export default function AdminCourses() {
   const [bulkText, setBulkText] = useState('');
   const [bulkResult, setBulkResult] = useState<{ created: any[]; skipped: any[] } | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [delOpen, setDelOpen] = useState(false);
+  const [delConfirm, setDelConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trash, setTrash] = useState<TrashItem[] | null>(null);
 
   async function load() {
     const r = await api.get<{ courses: Course[] }>('/courses');
     setCourses(r.courses);
+    setSelected(new Set());
   }
   async function loadGroups() {
     const r = await api.get<{ groups: CourseGroup[] }>('/groups');
@@ -84,37 +98,6 @@ export default function AdminCourses() {
     loadGroups();
     api.get<{ users: User[] }>('/admin/users?role=teacher').then((r) => setTeachers(r.users));
   }, []);
-
-  /* ---------- 교과군 관리 ---------- */
-  async function saveGroup(e: React.FormEvent) {
-    e.preventDefault();
-    if (groupForm.schedule.length === 0) return toast('교시를 하나 이상 선택하세요.', 'error');
-    setGroupSaving(true);
-    try {
-      if (groupForm.id) {
-        await api.put(`/admin/groups/${groupForm.id}`, { name: groupForm.name, schedule: groupForm.schedule });
-        toast('교과군이 수정되었습니다. 소속 강좌 시간도 함께 갱신됩니다.', 'success');
-      } else {
-        await api.post('/admin/groups', { name: groupForm.name, schedule: groupForm.schedule });
-        toast('교과군이 생성되었습니다.', 'success');
-      }
-      setGroupForm({ id: null, name: '', schedule: [] });
-      loadGroups();
-      load();
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : '저장 실패', 'error');
-    } finally {
-      setGroupSaving(false);
-    }
-  }
-
-  async function removeGroup(g: CourseGroup) {
-    if (!confirm(`'${g.name}' 교과군을 삭제하시겠습니까?\n소속 강좌는 현재 시간표를 유지한 채 교과군만 해제됩니다.`)) return;
-    await api.del(`/admin/groups/${g.id}`);
-    toast('교과군이 삭제되었습니다.', 'success');
-    loadGroups();
-    load();
-  }
 
   /* ---------- 강좌 일괄 등록 ---------- */
   const bulkRows = useMemo<{ rows: BulkCourseRow[]; errors: string[] }>(() => {
@@ -172,6 +155,66 @@ export default function AdminCourses() {
     } finally {
       setBulkSaving(false);
     }
+  }
+
+  /* ---------- 선택/전체 삭제 (휴지통 이동) + 복원 ---------- */
+  const allSelected = !!courses && courses.length > 0 && courses.every((c) => selected.has(c.id));
+  function toggleAll() {
+    if (!courses) return;
+    setSelected(allSelected ? new Set() : new Set(courses.map((c) => c.id)));
+  }
+  function toggleOne(id: number) {
+    const next = new Set(selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelected(next);
+  }
+
+  const selectedCourses = (courses || []).filter((c) => selected.has(c.id));
+  const selectedEnrollments = selectedCourses.reduce((sum, c) => sum + c.enrolled_count + c.waitlisted_count, 0);
+
+  async function bulkDelete() {
+    if (delConfirm !== '삭제') return;
+    setDeleting(true);
+    try {
+      const r = await api.post<{ deleted: number }>('/admin/courses/bulk-delete', { ids: [...selected] });
+      toast(`${r.deleted}개 강좌를 휴지통으로 이동했습니다. 휴지통에서 복원할 수 있습니다.`, 'success');
+      setDelOpen(false);
+      setDelConfirm('');
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '삭제에 실패했습니다.', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function loadTrash() {
+    const r = await api.get<{ trash: TrashItem[] }>('/admin/courses/trash');
+    setTrash(r.trash);
+  }
+  function openTrash() {
+    setTrash(null);
+    setTrashOpen(true);
+    loadTrash();
+  }
+  async function restoreCourse(t: TrashItem) {
+    await api.post(`/admin/courses/trash/${t.id}/restore`);
+    toast(`'${t.title}' 강좌가 복원되었습니다. 신청 내역도 그대로 돌아왔습니다.`, 'success');
+    loadTrash();
+    load();
+  }
+  async function purgeCourse(t: TrashItem) {
+    if (!confirm(`'${t.title}' 강좌를 영구 삭제하시겠습니까?\n신청 ${t.enrollment_count}건과 출석·공지 기록이 완전히 삭제되며 복구할 수 없습니다.`)) return;
+    await api.del(`/admin/courses/trash/${t.id}`);
+    toast('영구 삭제되었습니다.', 'success');
+    loadTrash();
+  }
+  async function purgeAll() {
+    if (!trash || trash.length === 0) return;
+    if (!confirm(`휴지통을 비우시겠습니까?\n강좌 ${trash.length}개와 연결된 신청·출석 기록이 완전히 삭제되며 복구할 수 없습니다.`)) return;
+    await api.del('/admin/courses/trash');
+    toast('휴지통을 비웠습니다.', 'success');
+    loadTrash();
   }
 
   function openCreate() {
@@ -248,9 +291,9 @@ export default function AdminCourses() {
   }
 
   async function remove(c: Course) {
-    if (!confirm(`'${c.title}' 강좌를 삭제하시겠습니까? 수강신청 내역도 함께 삭제됩니다.`)) return;
+    if (!confirm(`'${c.title}' 강좌를 삭제(휴지통 이동)하시겠습니까?\n잘못 삭제한 경우 휴지통에서 신청 내역까지 그대로 복원할 수 있습니다.`)) return;
     await api.del(`/courses/${c.id}`);
-    toast('강좌가 삭제되었습니다.', 'success');
+    toast('강좌를 휴지통으로 이동했습니다.', 'success');
     load();
   }
 
@@ -275,9 +318,14 @@ export default function AdminCourses() {
           <h1 className="text-2xl font-bold text-slate-900">강좌 관리</h1>
           <p className="text-sm text-slate-500">강좌는 기본적으로 강사가 개설합니다. 여기서는 미개설 강좌 추가, 정원 조정, 마감/폐강/삭제를 관리합니다.</p>
         </div>
-        <div className="flex gap-2">
-          <button className="btn-secondary" onClick={() => { setGroupForm({ id: null, name: '', schedule: [] }); setGroupModal(true); }}>
-            <Icons.calendar size={16} /> 교과군 관리
+        <div className="flex flex-wrap gap-2">
+          {selected.size > 0 && (
+            <button className="btn-danger" onClick={() => { setDelConfirm(''); setDelOpen(true); }}>
+              선택 삭제 ({selected.size})
+            </button>
+          )}
+          <button className="btn-secondary" onClick={openTrash}>
+            휴지통
           </button>
           <button className="btn-secondary" onClick={() => { setBulkResult(null); setBulkOpen(true); }}>
             <Icons.users size={16} /> 일괄 등록
@@ -296,6 +344,9 @@ export default function AdminCourses() {
             <table className="w-full min-w-[820px]">
               <thead className="border-b border-slate-200 bg-slate-50">
                 <tr>
+                  <th className="th w-10">
+                    <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
+                  </th>
                   <th className="th">강좌명</th>
                   <th className="th">강사</th>
                   <th className="th">시간</th>
@@ -308,7 +359,15 @@ export default function AdminCourses() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {courses.map((c) => (
-                  <tr key={c.id} className="hover:bg-slate-50">
+                  <tr key={c.id} className={`hover:bg-slate-50 ${selected.has(c.id) ? 'bg-brand-50/50' : ''}`}>
+                    <td className="td">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-600"
+                        checked={selected.has(c.id)}
+                        onChange={() => toggleOne(c.id)}
+                      />
+                    </td>
                     <td className="td">
                       <div className="flex items-center gap-2">
                         <CategoryBadge category={c.category} />
@@ -358,72 +417,81 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* 교과군 관리 모달 — 시간표 양식으로 교시 블록을 지정 */}
-      <Modal open={groupModal} onClose={() => setGroupModal(false)} title="교과군 관리" size="lg">
-        <div className="space-y-5">
-          <p className="text-sm text-slate-500">
-            교과군은 강좌들이 공유하는 <b>교시 블록</b>입니다. 강사는 강좌 개설 시 교과군을 선택해 시간을 배정받고,
-            교과군의 교시를 바꾸면 소속 강좌의 시간이 모두 함께 바뀝니다.
-          </p>
+      {/* 선택 삭제 확인 모달 — 이중 예방: 위험 안내 + '삭제' 입력 */}
+      <Modal open={delOpen} onClose={() => setDelOpen(false)} title="강좌 선택 삭제">
+        <div className="space-y-4">
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            ⚠️ 선택한 <b>{selected.size}개 강좌</b>를 삭제합니다.
+            {selectedEnrollments > 0 && (
+              <> 이 강좌들에는 <b>수강신청·대기 {selectedEnrollments}건</b>이 연결되어 있습니다.</>
+            )}
+            <br />
+            삭제된 강좌는 <b>휴지통으로 이동</b>하며, 잘못 삭제한 경우 신청 내역까지 그대로 복원할 수 있습니다.
+            단, 휴지통을 비우면 완전히 삭제되어 복구할 수 없습니다.
+          </div>
+          <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600">
+            {selectedCourses.map((c) => (
+              <div key={c.id} className="py-0.5">
+                {c.title} <span className="text-slate-400">— {c.teacher_name} · 신청 {c.enrolled_count + c.waitlisted_count}건</span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="label">
+              계속하려면 아래에 <b className="text-rose-600">삭제</b>를 입력하세요.
+            </label>
+            <input
+              className="input"
+              value={delConfirm}
+              onChange={(e) => setDelConfirm(e.target.value)}
+              placeholder="삭제"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setDelOpen(false)}>취소</button>
+            <button className="btn-danger" onClick={bulkDelete} disabled={deleting || delConfirm !== '삭제'}>
+              {deleting ? '삭제 중...' : `${selected.size}개 강좌 삭제`}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
-          {groups.length > 0 && (
-            <div className="space-y-2">
-              {groups.map((g) => (
-                <div
-                  key={g.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 px-4 py-2.5 ${
-                    groupForm.id === g.id ? 'border-brand-400 bg-brand-50' : 'border-slate-200'
-                  }`}
-                >
+      {/* 휴지통 모달 — 복원/영구 삭제 */}
+      <Modal open={trashOpen} onClose={() => setTrashOpen(false)} title="강좌 휴지통" size="lg">
+        {!trash ? (
+          <Spinner />
+        ) : trash.length === 0 ? (
+          <p className="py-8 text-center text-sm text-slate-400">휴지통이 비어 있습니다.</p>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-500">
+              삭제된 강좌입니다. <b>복원</b>하면 수강신청·출석 기록까지 삭제 전 상태로 되돌아갑니다.
+            </p>
+            <div className="max-h-[50vh] space-y-2 overflow-y-auto">
+              {trash.map((t) => (
+                <div key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-2.5">
                   <div className="min-w-0">
-                    <span className="font-bold text-slate-800">{g.name}</span>
-                    <span className="ml-2 text-sm text-brand-700">{scheduleLabel(g.schedule)}</span>
+                    <div className="font-semibold text-slate-800">
+                      {t.title}
+                      <span className="ml-2 text-xs font-normal text-slate-400">{t.semester}</span>
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {t.category} · {t.teacher_name} · 신청 {t.enrollment_count}건 · 삭제 {t.deleted_at.slice(0, 16).replace('T', ' ')}
+                    </div>
                   </div>
-                  <div className="flex gap-1">
-                    <button className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: g.id, name: g.name, schedule: g.schedule })}>
-                      수정
-                    </button>
-                    <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeGroup(g)}>삭제</button>
+                  <div className="flex gap-1.5">
+                    <button className="btn-secondary btn-sm" onClick={() => restoreCourse(t)}>복원</button>
+                    <button className="btn-ghost btn-sm text-rose-600" onClick={() => purgeCourse(t)}>영구 삭제</button>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-
-          <form onSubmit={saveGroup} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-slate-800">{groupForm.id ? `교과군 수정 · ${groupForm.name}` : '새 교과군 만들기'}</h3>
-              {groupForm.id && (
-                <button type="button" className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: null, name: '', schedule: [] })}>
-                  + 새로 만들기
-                </button>
-              )}
+            <div className="flex justify-between">
+              <button className="btn-ghost btn-sm text-rose-600" onClick={purgeAll}>휴지통 비우기</button>
+              <button className="btn-secondary" onClick={() => setTrashOpen(false)}>닫기</button>
             </div>
-            <div>
-              <label className="label">교과군 이름 *</label>
-              <input
-                className="input"
-                value={groupForm.name}
-                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
-                placeholder="예: A군 (월·수 8~9교시)"
-                required
-              />
-            </div>
-            <div>
-              <label className="label">교시 블록 * — 시간표에서 클릭해 선택</label>
-              <PeriodPicker value={groupForm.schedule} onChange={(v) => setGroupForm({ ...groupForm, schedule: v })} />
-            </div>
-            {groupForm.id && (
-              <p className="text-xs text-amber-600">⚠️ 저장하면 이 교과군 소속 강좌들의 수업 시간이 새 교시로 일괄 변경됩니다.</p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setGroupModal(false)}>닫기</button>
-              <button className="btn-primary" disabled={groupSaving}>
-                {groupSaving ? '저장 중...' : groupForm.id ? '교과군 저장' : '교과군 생성'}
-              </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        )}
       </Modal>
 
       {/* 강좌 일괄 등록 모달 */}
@@ -528,9 +596,7 @@ export default function AdminCourses() {
               ))}
             </select>
             {form.group_id ? (
-              <p className="text-sm font-medium text-brand-700">
-                {scheduleLabel(groups.find((g) => g.id === form.group_id)?.schedule)}
-              </p>
+              <PeriodPicker value={groups.find((g) => g.id === form.group_id)?.schedule || []} readOnly />
             ) : (
               <PeriodPicker value={form.schedule} onChange={(v) => setForm({ ...form, schedule: v })} />
             )}

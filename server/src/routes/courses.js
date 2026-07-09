@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { all, get, run, batch, getSetting } from '../db.js';
+import { all, get, run, getSetting } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
-import { decorateCourse, decorateCourses, getActiveSemester, PERIOD_TIMES } from '../logic.js';
+import { decorateCourse, decorateCourses, getActiveSemester, trashCourses, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 
@@ -243,17 +243,12 @@ router.patch('/:id/status', authRequired, requireRole('admin', 'teacher'), ah(as
   res.json({ ok: true });
 }));
 
-// Delete course (admin) — children removed explicitly so behavior doesn't
-// depend on the remote DB's foreign_keys pragma.
+// Delete course (admin) — 휴지통으로 이동(soft delete). 신청·출석 등 하위 데이터는
+// 보존되어 관리자 휴지통에서 복원하면 그대로 돌아온다.
 router.delete('/:id', authRequired, requireRole('admin'), ah(async (req, res) => {
   const course = await get('SELECT * FROM courses WHERE id = ?', [req.params.id]);
   if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
-  await batch([
-    { sql: 'DELETE FROM attendance WHERE course_id = ?', args: [course.id] },
-    { sql: 'DELETE FROM announcements WHERE course_id = ?', args: [course.id] },
-    { sql: 'DELETE FROM enrollments WHERE course_id = ?', args: [course.id] },
-    { sql: 'DELETE FROM courses WHERE id = ?', args: [course.id] },
-  ]);
+  await trashCourses([course.id], req.user.id);
   res.json({ ok: true });
 }));
 

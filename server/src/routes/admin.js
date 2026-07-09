@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
-import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester, PERIOD_TIMES } from '../logic.js';
+import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester, trashCourses, restoreTrashedCourse, purgeTrashedCourses, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -75,6 +75,47 @@ router.get('/class-status', ah(async (req, res) => {
     classMap.get(key).students.push({ ...s, enrollments: byStudent[s.id] || [] });
   }
   res.json({ semester, classes: [...classMap.values()] });
+}));
+
+/* ---------------- 폐강 재신청 대상 ---------------- */
+// 폐강(cancelled) 강좌를 신청했던 학생 목록 — 추가 신청 안내 대상.
+// 전체/반별 목록 및 인쇄에 사용한다. (폐강 신청분은 신청 한도에서 제외되어 재신청 가능)
+router.get('/cancelled-enrollments', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  const rows = await all(
+    `SELECT u.id AS student_id, u.name, u.grade, u.class_no, u.student_no,
+            c.title, c.category, e.status, t.name AS teacher_name, g.name AS group_name
+     FROM enrollments e
+     JOIN courses c ON c.id = e.course_id
+     JOIN users u ON u.id = e.student_id
+     LEFT JOIN users t ON t.id = c.teacher_id
+     LEFT JOIN course_groups g ON g.id = c.group_id
+     WHERE c.semester = ? AND c.status = 'cancelled' AND e.status != 'cancelled'
+     ORDER BY u.grade, u.class_no, u.student_no, c.title`,
+    [semester]
+  );
+  // 학생 단위로 묶는다 (한 학생이 폐강 강좌 여러 개를 신청했을 수 있음)
+  const byStudent = new Map();
+  for (const r of rows) {
+    if (!byStudent.has(r.student_id)) {
+      byStudent.set(r.student_id, {
+        student_id: r.student_id,
+        name: r.name,
+        grade: r.grade,
+        class_no: r.class_no,
+        student_no: r.student_no,
+        courses: [],
+      });
+    }
+    byStudent.get(r.student_id).courses.push({
+      title: r.title,
+      category: r.category,
+      teacher_name: r.teacher_name || '미배정',
+      group_name: r.group_name || null,
+      was_waitlisted: r.status === 'waitlisted',
+    });
+  }
+  res.json({ semester, students: [...byStudent.values()] });
 }));
 
 /* ---------------- 교과군 (시간 블록 그룹) ---------------- */
@@ -328,12 +369,17 @@ router.delete('/semesters/:code', ah(async (req, res) => {
   if (code === active) {
     return res.status(400).json({ error: '활성 세션은 삭제할 수 없습니다. 먼저 다른 세션을 활성화하세요.' });
   }
-  const inSemester = 'SELECT id FROM courses WHERE semester = ?';
+  // 휴지통에 있는 이 세션 강좌의 하위 데이터까지 함께 정리한다.
+  const inSemester =
+    'SELECT id FROM courses WHERE semester = ? UNION SELECT id FROM courses_trash WHERE semester = ?';
+  const args = [code, code];
   await batch([
-    { sql: `DELETE FROM attendance WHERE course_id IN (${inSemester})`, args: [code] },
-    { sql: `DELETE FROM announcements WHERE course_id IN (${inSemester})`, args: [code] },
-    { sql: `DELETE FROM enrollments WHERE course_id IN (${inSemester})`, args: [code] },
+    { sql: `DELETE FROM attendance WHERE course_id IN (${inSemester})`, args },
+    { sql: `DELETE FROM announcements WHERE course_id IN (${inSemester})`, args },
+    { sql: `DELETE FROM enrollments WHERE course_id IN (${inSemester})`, args },
+    { sql: `DELETE FROM course_files WHERE course_id IN (${inSemester})`, args },
     { sql: 'DELETE FROM courses WHERE semester = ?', args: [code] },
+    { sql: 'DELETE FROM courses_trash WHERE semester = ?', args: [code] },
     { sql: 'DELETE FROM semesters WHERE code = ?', args: [code] },
   ]);
   res.json({ ok: true });
@@ -637,6 +683,62 @@ router.post('/courses/bulk', ah(async (req, res) => {
     created.push({ title: c.title, group: group.name });
   }
   res.status(201).json({ created, skipped });
+}));
+
+/* ---------------- Course bulk delete + 휴지통 ---------------- */
+// Bulk-delete courses → 휴지통 이동 (복원 가능). 하위 데이터는 보존.
+router.post('/courses/bulk-delete', ah(async (req, res) => {
+  const schema = z.object({ ids: z.array(z.number().int()).min(1).max(500) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '삭제할 강좌를 선택하세요.' });
+  const deleted = await trashCourses([...new Set(parsed.data.ids)], req.user.id);
+  if (!deleted) return res.status(404).json({ error: '삭제할 강좌를 찾을 수 없습니다.' });
+  res.json({ ok: true, deleted });
+}));
+
+// 휴지통 목록 — 스냅샷에 보존된 신청 건수와 함께 (복원 시 그대로 돌아옴)
+router.get('/courses/trash', ah(async (req, res) => {
+  const rows = await all('SELECT * FROM courses_trash ORDER BY deleted_at DESC');
+  const teachers = await all("SELECT id, name FROM users WHERE role = 'teacher'");
+  const teacherMap = Object.fromEntries(teachers.map((t) => [t.id, t.name]));
+  res.json({
+    trash: rows.map((r) => {
+      const bundle = JSON.parse(r.data);
+      const course = bundle.course || bundle; // (구버전 스냅샷 호환)
+      const enrollments = bundle.enrollments || [];
+      return {
+        id: r.id,
+        title: r.title,
+        semester: r.semester,
+        category: course.category,
+        teacher_name: teacherMap[course.teacher_id] || '미배정',
+        enrollment_count: enrollments.filter((e) => e.status !== 'cancelled').length,
+        deleted_at: r.deleted_at,
+      };
+    }),
+  });
+}));
+
+// 휴지통에서 복원 — 강좌·신청·출석·공지·강의계획서를 삭제 전 상태로 되살린다.
+router.post('/courses/trash/:id/restore', ah(async (req, res) => {
+  const title = await restoreTrashedCourse(req.params.id);
+  if (title === null) return res.status(404).json({ error: '휴지통에서 강좌를 찾을 수 없습니다.' });
+  res.json({ ok: true, title });
+}));
+
+// 휴지통 영구 삭제 (개별) — 이때 비로소 신청·출석 등 하위 데이터도 삭제된다.
+router.delete('/courses/trash/:id', ah(async (req, res) => {
+  const row = await get('SELECT id FROM courses_trash WHERE id = ?', [req.params.id]);
+  if (!row) return res.status(404).json({ error: '휴지통에서 강좌를 찾을 수 없습니다.' });
+  await purgeTrashedCourses([row.id]);
+  res.json({ ok: true });
+}));
+
+// 휴지통 비우기 (전체 영구 삭제)
+router.delete('/courses/trash', ah(async (req, res) => {
+  const rows = await all('SELECT id FROM courses_trash');
+  if (rows.length) await purgeTrashedCourses(rows.map((r) => r.id));
+  res.json({ ok: true, purged: rows.length });
 }));
 
 /* ---------------- Enrollment management ---------------- */

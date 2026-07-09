@@ -272,11 +272,14 @@ export default function TeacherCourses() {
                 ))}
               </select>
               {form.group_id ? (
-                <p className="mt-1.5 text-sm font-medium text-brand-700">
-                  {scheduleLabel(groups.find((g) => g.id === form.group_id)?.schedule)}
-                </p>
+                <div className="mt-2">
+                  <PeriodPicker value={groups.find((g) => g.id === form.group_id)?.schedule || []} readOnly />
+                </div>
               ) : editing && form.schedule.length > 0 ? (
-                <p className="mt-1.5 text-sm text-slate-500">현재: {scheduleLabel(form.schedule)} (변경하려면 교과군 선택)</p>
+                <div className="mt-2">
+                  <PeriodPicker value={form.schedule} readOnly />
+                  <p className="mt-1 text-sm text-slate-500">현재 배정 시간입니다. 변경하려면 교과군을 선택하세요.</p>
+                </div>
               ) : null}
             </div>
           ) : (

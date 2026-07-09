@@ -66,11 +66,14 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
     return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
   }
 
-  // max courses limit (세션별 설정)
-  const max = Number((await getActiveSemester()).max_courses_per_student || 3);
+  // max courses limit (세션별 설정) — 폐강 강좌 신청분은 한도에서 제외해 재신청이 가능하게 한다.
+  const semester = await getActiveSemester();
+  const max = Number(semester.max_courses_per_student || 3);
   const activeRow = await get(
-    "SELECT COUNT(*) AS c FROM enrollments WHERE student_id = ? AND status IN ('enrolled','waitlisted')",
-    [student.id]
+    `SELECT COUNT(*) AS c FROM enrollments e JOIN courses c ON c.id = e.course_id
+     WHERE e.student_id = ? AND e.status IN ('enrolled','waitlisted')
+       AND c.status != 'cancelled' AND c.semester = ?`,
+    [student.id, semester.code]
   );
   if (activeRow.c >= max) {
     return res.status(400).json({ error: `최대 ${max}개까지 신청할 수 있습니다.` });
