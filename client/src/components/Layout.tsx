@@ -9,6 +9,7 @@ export interface NavItem {
   to: string;
   label: string;
   icon: ReactNode;
+  section?: string; // 설정 시 이 항목 앞에 그룹 구분선/헤더 표시
 }
 
 export default function Layout({ nav, children }: { nav: NavItem[]; children: ReactNode }) {
@@ -57,25 +58,31 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
       </div>
       <nav className="flex-1 space-y-1 px-3">
         {nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end
-            onClick={() => setMobileOpen(false)}
-            className={({ isActive }) =>
-              `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                isActive ? 'bg-white/15 text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white" />}
-                <span className="flex h-5 w-5 items-center justify-center">{item.icon}</span>
-                {item.label}
-              </>
+          <div key={item.to}>
+            {item.section && (
+              <div className="mt-4 mb-1 border-t border-white/10 px-3 pt-3 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                {item.section}
+              </div>
             )}
-          </NavLink>
+            <NavLink
+              to={item.to}
+              end
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive ? 'bg-white/15 text-white shadow-sm' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-white" />}
+                  <span className="flex h-5 w-5 items-center justify-center">{item.icon}</span>
+                  {item.label}
+                </>
+              )}
+            </NavLink>
+          </div>
         ))}
       </nav>
       <div className="p-3">

@@ -49,13 +49,16 @@ function RequireRole({ role }: { role: Role }) {
 
 const adminNav: NavItem[] = [
   { to: '/admin', label: '대시보드', icon: <Icons.dashboard /> },
-  { to: '/admin/courses', label: '강좌 관리', icon: <Icons.book /> },
+  // 준비: 학기 설정 → 회원 등록 → 강좌 개설
+  { to: '/admin/settings', label: '세션(학기) 관리', icon: <Icons.settings />, section: '준비' },
   { to: '/admin/users', label: '회원 관리', icon: <Icons.users /> },
-  { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard /> },
+  { to: '/admin/courses', label: '강좌 관리', icon: <Icons.book /> },
+  // 운영: 신청 현황 모니터링
+  { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard />, section: '운영' },
   { to: '/admin/classes', label: '반별 현황', icon: <Icons.users /> },
   { to: '/admin/cancelled', label: '폐강 재신청', icon: <Icons.clipboard /> },
-  { to: '/admin/finance', label: '정산 관리', icon: <Icons.wallet /> },
-  { to: '/admin/settings', label: '세션(학기) 관리', icon: <Icons.settings /> },
+  // 마감: 정산
+  { to: '/admin/finance', label: '정산 관리', icon: <Icons.wallet />, section: '마감' },
 ];
 const teacherNav: NavItem[] = [
   { to: '/teacher', label: '대시보드', icon: <Icons.dashboard /> },
