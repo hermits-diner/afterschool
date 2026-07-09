@@ -262,6 +262,43 @@ router.post('/users/bulk', ah(async (req, res) => {
   res.status(201).json({ created, skipped });
 }));
 
+// Bulk-register teachers: 아이디 + 이름 + 담당분야 + 임시비밀번호.
+// 첫 로그인 시 비밀번호 변경 강제 (학생 일괄등록과 동일한 흐름).
+router.post('/users/bulk-teachers', ah(async (req, res) => {
+  const schema = z.object({
+    teachers: z
+      .array(
+        z.object({
+          username: z.string().min(3, '아이디는 3자 이상이어야 합니다.'),
+          name: z.string().min(1),
+          subject_area: z.string().optional(),
+          password: z.string().min(4, '임시비밀번호는 4자 이상이어야 합니다.'),
+        })
+      )
+      .min(1)
+      .max(200),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+
+  const created = [];
+  const skipped = [];
+  for (const t of parsed.data.teachers) {
+    const dupe = await get('SELECT id FROM users WHERE username = ?', [t.username]);
+    if (dupe) {
+      skipped.push({ username: t.username, name: t.name, reason: '이미 존재하는 아이디' });
+      continue;
+    }
+    await run(
+      `INSERT INTO users (username, password_hash, role, name, subject_area, must_change_password)
+       VALUES (?, ?, 'teacher', ?, ?, 1)`,
+      [t.username, hashPassword(t.password), t.name, t.subject_area || null]
+    );
+    created.push({ username: t.username, name: t.name });
+  }
+  res.status(201).json({ created, skipped });
+}));
+
 // Bulk-delete users by id (본인 계정은 자동 제외).
 router.post('/users/bulk-delete', ah(async (req, res) => {
   const schema = z.object({ ids: z.array(z.number().int()).min(1).max(500) });

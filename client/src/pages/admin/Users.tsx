@@ -19,6 +19,13 @@ interface BulkRow {
   password: string;
 }
 
+interface BulkTeacherRow {
+  username: string;
+  name: string;
+  subject_area?: string;
+  password: string;
+}
+
 // 4자리 학번 '1101'(학년1+반1+번호2) 또는 '1-1-1' 형식을 파싱한다.
 function parseStudentId(token: string): { grade: number; class_no: number; student_no: number } | null {
   let m = token.match(/^([1-3])(\d)(\d{2})$/);
@@ -83,9 +90,10 @@ export default function AdminUsers() {
     }
   }
 
-  /* ---------- 일괄 등록 ---------- */
-  const bulkRows = useMemo<{ rows: BulkRow[]; errors: string[] }>(() => {
-    const rows: BulkRow[] = [];
+  /* ---------- 일괄 등록 (학생/강사) ---------- */
+  const bulkRows = useMemo<{ students: BulkRow[]; teachers: BulkTeacherRow[]; count: number; errors: string[] }>(() => {
+    const students: BulkRow[] = [];
+    const teachers: BulkTeacherRow[] = [];
     const errors: string[] = [];
     bulkText
       .split('\n')
@@ -97,30 +105,49 @@ export default function AdminUsers() {
           errors.push(`${i + 1}행: 형식 오류 — "${line}"`);
           return;
         }
-        const sid = parseStudentId(parts[0]);
-        if (!sid) {
-          errors.push(`${i + 1}행: 학번 형식 오류 — "${parts[0]}" (4자리, 예: 1101 또는 1-1-1)`);
-          return;
+        if (tab === 'student') {
+          const sid = parseStudentId(parts[0]);
+          if (!sid) {
+            errors.push(`${i + 1}행: 학번 형식 오류 — "${parts[0]}" (4자리, 예: 1101 또는 1-1-1)`);
+            return;
+          }
+          const password = parts[2] || bulkPw;
+          if (!password || password.length < 4) {
+            errors.push(`${i + 1}행: 임시비밀번호 없음/4자 미만 (공통 임시비밀번호를 입력하세요)`);
+            return;
+          }
+          students.push({ ...sid, name: parts[1], password });
+        } else {
+          // 강사: 아이디 이름 [담당분야] [임시비밀번호]
+          const [username, name, subject, pw] = parts;
+          if (username.length < 3) {
+            errors.push(`${i + 1}행: 아이디는 3자 이상이어야 합니다 — "${username}"`);
+            return;
+          }
+          const password = pw || bulkPw;
+          if (!password || password.length < 4) {
+            errors.push(`${i + 1}행: 임시비밀번호 없음/4자 미만 (공통 임시비밀번호를 입력하세요)`);
+            return;
+          }
+          teachers.push({ username, name, subject_area: subject || undefined, password });
         }
-        const name = parts[1];
-        const password = parts[2] || bulkPw;
-        if (!password || password.length < 4) {
-          errors.push(`${i + 1}행: 임시비밀번호 없음/4자 미만 (공통 임시비밀번호를 입력하세요)`);
-          return;
-        }
-        rows.push({ ...sid, name, password });
       });
-    return { rows, errors };
-  }, [bulkText, bulkPw]);
+    return { students, teachers, count: students.length + teachers.length, errors };
+  }, [bulkText, bulkPw, tab]);
 
   async function submitBulk() {
-    if (bulkRows.rows.length === 0) return toast('등록할 학생이 없습니다.', 'error');
+    if (bulkRows.count === 0) return toast('등록할 대상이 없습니다.', 'error');
     if (bulkRows.errors.length > 0) return toast('형식 오류를 먼저 해결하세요.', 'error');
     setBulkSaving(true);
     try {
-      const r = await api.post<{ created: any[]; skipped: any[] }>('/admin/users/bulk', {
-        students: bulkRows.rows,
-      });
+      const r =
+        tab === 'teacher'
+          ? await api.post<{ created: any[]; skipped: any[] }>('/admin/users/bulk-teachers', {
+              teachers: bulkRows.teachers,
+            })
+          : await api.post<{ created: any[]; skipped: any[] }>('/admin/users/bulk', {
+              students: bulkRows.students,
+            });
       setBulkResult(r);
       toast(`${r.created.length}명 등록 완료${r.skipped.length ? ` · ${r.skipped.length}명 건너뜀` : ''}`, 'success');
       load();
@@ -208,7 +235,7 @@ export default function AdminUsers() {
           <p className="text-sm text-slate-500">학생·강사·관리자 계정을 등록하고 관리합니다.</p>
         </div>
         <div className="flex gap-2">
-          {tab === 'student' && (
+          {tab !== 'admin' && (
             <button className="btn-secondary" onClick={openBulk}>
               <Icons.users size={16} /> 일괄 등록
             </button>
@@ -311,8 +338,8 @@ export default function AdminUsers() {
         </div>
       )}
 
-      {/* 일괄 등록 모달 */}
-      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="학생 일괄 등록" size="lg">
+      {/* 일괄 등록 모달 (학생/강사) */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`${roleLabel(tab)} 일괄 등록`} size="lg">
         {bulkResult ? (
           <div>
             <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
@@ -327,8 +354,11 @@ export default function AdminUsers() {
               </div>
             )}
             <p className="mb-4 text-sm text-slate-500">
-              등록된 학생은 <b>아이디 = 연도+학번</b>(예: 20261101), 입력한 임시비밀번호로 로그인하며,
-              첫 로그인 시 비밀번호 변경이 필요합니다.
+              {tab === 'student' ? (
+                <>등록된 학생은 <b>아이디 = 연도+학번</b>(예: 20261101), 입력한 임시비밀번호로 로그인하며, 첫 로그인 시 비밀번호 변경이 필요합니다.</>
+              ) : (
+                <>등록된 강사는 입력한 아이디·임시비밀번호로 로그인하며, 첫 로그인 시 <b>개별 비밀번호로 변경</b>해야 합니다.</>
+              )}
             </p>
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => setBulkResult(null)}>더 등록하기</button>
@@ -337,17 +367,28 @@ export default function AdminUsers() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 명씩 <b>학번(4자리) 이름 [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
-              <br />학번 = 학년(1)+반(1)+번호(2). 아이디는 <b>연도+학번</b>으로 자동 설정됩니다 (예: 1학년 1반 1번 → <b>20261101</b>).
-              <div className="mt-1 font-mono text-xs text-slate-500">
-                1101 김민준 pass1234<br />
-                1-1-2 이서연 <span className="text-slate-400">← 비밀번호 생략 시 아래 공통 임시비밀번호 적용</span>
+            {tab === 'student' ? (
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                한 줄에 한 명씩 <b>학번(4자리) 이름 [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
+                <br />학번 = 학년(1)+반(1)+번호(2). 아이디는 <b>연도+학번</b>으로 자동 설정됩니다 (예: 1학년 1반 1번 → <b>20261101</b>).
+                <div className="mt-1 font-mono text-xs text-slate-500">
+                  1101 김민준 pass1234<br />
+                  1-1-2 이서연 <span className="text-slate-400">← 비밀번호 생략 시 아래 공통 임시비밀번호 적용</span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                한 줄에 한 명씩 <b>아이디 이름 [담당분야] [임시비밀번호]</b> 순서로 입력하세요. 공백/쉼표/탭 구분, 엑셀 붙여넣기 지원.
+                <div className="mt-1 font-mono text-xs text-slate-500">
+                  kimhan 김한국 국어 pass1234<br />
+                  leemat 이수리 수학 <span className="text-slate-400">← 비밀번호 생략 시 아래 공통 임시비밀번호 적용</span><br />
+                  parkgym 박체육 <span className="text-slate-400">← 담당분야도 생략 가능</span>
+                </div>
+              </div>
+            )}
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'1101 김민준 pass1234\n1102 이서연\n1103 박도윤'}
+              placeholder={tab === 'student' ? '1101 김민준 pass1234\n1102 이서연\n1103 박도윤' : 'kimhan 김한국 국어 pass1234\nleemat 이수리 수학\nparkgym 박체육'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
@@ -364,13 +405,13 @@ export default function AdminUsers() {
             )}
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">
-                등록 대상 <b className="text-slate-800">{bulkRows.rows.length}명</b>
+                등록 대상 <b className="text-slate-800">{bulkRows.count}명</b>
                 {bulkRows.errors.length > 0 && <span className="text-rose-600"> · 오류 {bulkRows.errors.length}건</span>}
               </span>
               <div className="flex gap-2">
                 <button className="btn-secondary" onClick={() => setBulkOpen(false)}>취소</button>
-                <button className="btn-primary" onClick={submitBulk} disabled={bulkSaving || bulkRows.rows.length === 0 || bulkRows.errors.length > 0}>
-                  {bulkSaving ? '등록 중...' : `${bulkRows.rows.length}명 등록`}
+                <button className="btn-primary" onClick={submitBulk} disabled={bulkSaving || bulkRows.count === 0 || bulkRows.errors.length > 0}>
+                  {bulkSaving ? '등록 중...' : `${bulkRows.count}명 등록`}
                 </button>
               </div>
             </div>
