@@ -275,7 +275,6 @@ export default function AdminFinance() {
                   <th className="th">강사</th>
                   <th className="th text-center">담당 강좌</th>
                   <th className="th text-center">총 실시 회차</th>
-                  <th className="th text-right">수강료 수입</th>
                   <th className="th text-right">강사료 합계</th>
                 </tr>
               </thead>
@@ -285,7 +284,6 @@ export default function AdminFinance() {
                     <td className="td font-semibold">{t.teacher_name}</td>
                     <td className="td text-center">{t.course_count}개</td>
                     <td className="td text-center">{t.session_count}회</td>
-                    <td className="td text-right text-slate-500">{won(t.revenue)}</td>
                     <td className="td text-right font-bold text-emerald-700">{won(t.teacher_pay)}</td>
                   </tr>
                 ))}
