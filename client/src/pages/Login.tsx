@@ -113,7 +113,9 @@ export default function Login() {
                 <span>📖 수능 국어</span><span>✍️ 영어 독해</span><span>📐 수학 심화</span>
                 <span>🌏 사회탐구</span><span>🧪 과학탐구</span><span>📚 문학·독서</span>
                 <span>🗣️ 영어 회화</span><span>📝 논술</span><span>🧮 미적분</span>
-                <span>🔬 물리·화학 실험</span><span>🏛️ 한국사</span><span>⚽ 스포츠</span>
+                <span>🔬 물리·화학 실험</span><span>🏛️ 한국사</span>
+                <span>💻 프로그래밍</span><span>🎨 미술</span><span>🎹 음악</span>
+                <span>⚽ 축구</span><span>🏀 농구</span><span>💃 댄스</span>
               </span>
             ))}
           </div>
