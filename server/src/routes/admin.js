@@ -43,6 +43,75 @@ router.get('/stats', ah(async (req, res) => {
   res.json({ counts, byCategory, popularCourses: courses });
 }));
 
+/* ---------------- Finance (정산) ---------------- */
+// 수강료 수입 = 수강확정 인원 × 수강료 단가
+// 강사료 = 회당 단가(pay_rate) × 실시 회차(출석부에 기록된 날짜 수)
+router.get('/finance', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  const courses = await all(
+    "SELECT * FROM courses WHERE semester = ? AND status != 'cancelled' ORDER BY teacher_id, day_of_week, start_time",
+    [semester]
+  );
+  const decorated = await decorateCourses(courses);
+
+  // 강좌별 실시 회차: 출석 체크된 고유 날짜 수
+  const sessions = await all(
+    `SELECT a.course_id, COUNT(DISTINCT a.date) AS s
+     FROM attendance a JOIN courses c ON c.id = a.course_id
+     WHERE c.semester = ? GROUP BY a.course_id`,
+    [semester]
+  );
+  const sessionMap = Object.fromEntries(sessions.map((r) => [r.course_id, r.s]));
+
+  const rows = decorated.map((c) => {
+    const sessionCount = sessionMap[c.id] || 0;
+    const revenue = c.enrolled_count * c.fee;
+    const teacherPay = c.pay_rate * sessionCount;
+    return {
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      status: c.status,
+      teacher_id: c.teacher_id,
+      teacher_name: c.teacher_name,
+      enrolled_count: c.enrolled_count,
+      fee: c.fee,
+      revenue,
+      pay_rate: c.pay_rate,
+      session_count: sessionCount,
+      teacher_pay: teacherPay,
+    };
+  });
+
+  // 강사별 집계
+  const byTeacherMap = new Map();
+  for (const r of rows) {
+    const key = r.teacher_id ?? 0;
+    const t = byTeacherMap.get(key) || {
+      teacher_id: r.teacher_id,
+      teacher_name: r.teacher_name,
+      course_count: 0,
+      session_count: 0,
+      teacher_pay: 0,
+      revenue: 0,
+    };
+    t.course_count += 1;
+    t.session_count += r.session_count;
+    t.teacher_pay += r.teacher_pay;
+    t.revenue += r.revenue;
+    byTeacherMap.set(key, t);
+  }
+  const byTeacher = [...byTeacherMap.values()].sort((a, b) => b.teacher_pay - a.teacher_pay);
+
+  const totals = {
+    revenue: rows.reduce((s, r) => s + r.revenue, 0),
+    teacher_pay: rows.reduce((s, r) => s + r.teacher_pay, 0),
+  };
+  totals.net = totals.revenue - totals.teacher_pay;
+
+  res.json({ semester, courses: rows, byTeacher, totals });
+}));
+
 /* ---------------- Semester (세션) management ---------------- */
 const semesterSchema = z.object({
   code: z.string().regex(/^\d{4}-[12]$/, "세션 코드는 '2026-1' 형식이어야 합니다."),

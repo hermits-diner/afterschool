@@ -76,6 +76,7 @@ const SCHEMA = [
     room          TEXT,
     target_grade  INTEGER,
     fee           INTEGER NOT NULL DEFAULT 0,
+    pay_rate      INTEGER NOT NULL DEFAULT 0,   -- 강사료 회당 단가(원)
     semester      TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','cancelled')),
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -144,9 +145,12 @@ export async function initSchema() {
     await client.execute('PRAGMA foreign_keys = ON').catch(() => {});
   }
   await batch(SCHEMA);
-  // Migration for databases created before the column existed.
+  // Migrations for databases created before these columns existed.
   await client
     .execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
+  await client
+    .execute('ALTER TABLE courses ADD COLUMN pay_rate INTEGER NOT NULL DEFAULT 0')
     .catch(() => {});
   await batch(
     Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({

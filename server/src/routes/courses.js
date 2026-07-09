@@ -61,6 +61,7 @@ const courseSchema = z.object({
   room: z.string().optional().default(''),
   target_grade: z.number().int().min(0).max(3).default(0),
   fee: z.number().int().min(0).default(0),
+  pay_rate: z.number().int().min(0).default(0), // 강사료 회당 단가(원) — 관리자만 설정
   semester: z.string().optional(),
   status: z.enum(['open', 'closed', 'cancelled']).optional(),
 });
@@ -79,6 +80,7 @@ function courseValues(d) {
     d.room ?? '',
     d.target_grade,
     d.fee,
+    d.pay_rate ?? 0,
     d.status,
   ];
 }
@@ -90,14 +92,17 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
     return res.status(400).json({ error: parsed.error.issues[0].message });
   }
   const d = parsed.data;
-  if (req.user.role === 'teacher') d.teacher_id = req.user.id; // 강사는 본인 강좌만
+  if (req.user.role === 'teacher') {
+    d.teacher_id = req.user.id; // 강사는 본인 강좌만
+    d.pay_rate = 0; // 강사료 단가는 관리자가 책정
+  }
   if (d.start_time >= d.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
   }
   const info = await run(
     `INSERT INTO courses
-     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, status, semester)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, pay_rate, status, semester)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       ...courseValues({ ...d, status: d.status || 'open' }),
       d.semester || (await getSetting('semester')),
@@ -117,13 +122,16 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   const parsed = courseSchema.partial().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const merged = { ...existing, ...parsed.data };
-  if (req.user.role === 'teacher') merged.teacher_id = existing.teacher_id; // 담당 강사 변경은 관리자만
+  if (req.user.role === 'teacher') {
+    merged.teacher_id = existing.teacher_id; // 담당 강사 변경은 관리자만
+    merged.pay_rate = existing.pay_rate; // 강사료 단가 변경도 관리자만
+  }
   if (merged.start_time >= merged.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
   }
   await run(
     `UPDATE courses SET title=?, category=?, description=?, teacher_id=?, capacity=?,
-     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, fee=?, status=?
+     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, fee=?, pay_rate=?, status=?
      WHERE id=?`,
     [...courseValues(merged), existing.id]
   );

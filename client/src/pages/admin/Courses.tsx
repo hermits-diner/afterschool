@@ -17,6 +17,7 @@ type Form = {
   room: string;
   target_grade: number;
   fee: number;
+  pay_rate: number;
 };
 
 const emptyForm: Form = {
@@ -31,6 +32,7 @@ const emptyForm: Form = {
   room: '',
   target_grade: 0,
   fee: 0,
+  pay_rate: 0,
 };
 
 export default function AdminCourses() {
@@ -72,6 +74,7 @@ export default function AdminCourses() {
       room: c.room || '',
       target_grade: c.target_grade,
       fee: c.fee,
+      pay_rate: c.pay_rate || 0,
     });
     setModalOpen(true);
   }
@@ -264,13 +267,17 @@ export default function AdminCourses() {
               </select>
             </div>
             <div>
-              <label className="label">수강료(원)</label>
-              <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
-            </div>
-            <div>
               <label className="label">강의실</label>
               <input className="input" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="예: 201호" />
             </div>
+            <div>
+              <label className="label">수강료(원)</label>
+              <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
+            </div>
+          </div>
+          <div>
+            <label className="label">회당 강사료(원) — 정산 관리에서 강사료 계산에 사용</label>
+            <input type="number" min={0} step={1000} className="input" value={form.pay_rate} onChange={(e) => setForm({ ...form, pay_rate: Number(e.target.value) })} placeholder="예: 40000" />
           </div>
           <div>
             <label className="label">강좌 소개</label>

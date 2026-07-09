@@ -13,7 +13,9 @@ import AdminCourses from './pages/admin/Courses';
 import AdminUsers from './pages/admin/Users';
 import AdminEnrollments from './pages/admin/Enrollments';
 import AdminSettings from './pages/admin/Settings';
+import AdminFinance from './pages/admin/Finance';
 import AdminPrintEnrollments from './pages/admin/PrintEnrollments';
+import AdminPrintFinance from './pages/admin/PrintFinance';
 
 import TeacherDashboard from './pages/teacher/Dashboard';
 import TeacherCourses from './pages/teacher/Courses';
@@ -46,6 +48,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/courses', label: '강좌 관리', icon: <Icons.book /> },
   { to: '/admin/users', label: '회원 관리', icon: <Icons.users /> },
   { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard /> },
+  { to: '/admin/finance', label: '정산 관리', icon: <Icons.wallet /> },
   { to: '/admin/settings', label: '세션(학기) 관리', icon: <Icons.settings /> },
 ];
 const teacherNav: NavItem[] = [
@@ -84,13 +87,15 @@ export default function App() {
 
       {/* Admin */}
       <Route element={<RequireRole role="admin" />}>
-        {/* Standalone print view (no sidebar) */}
+        {/* Standalone print views (no sidebar) */}
         <Route path="/admin/print/enrollments" element={<AdminPrintEnrollments />} />
+        <Route path="/admin/print/finance" element={<AdminPrintFinance />} />
         <Route element={<RoleLayout nav={adminNav} />}>
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/courses" element={<AdminCourses />} />
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/enrollments" element={<AdminEnrollments />} />
+          <Route path="/admin/finance" element={<AdminFinance />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/admin/settings/password" element={<ChangePassword />} />
         </Route>
