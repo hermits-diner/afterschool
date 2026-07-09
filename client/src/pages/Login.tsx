@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, Role, ApiError } from '../lib/api';
-import { Check, GraduationCap, Backpack, Presentation, ShieldCheck } from 'lucide-react';
+import { Check, GraduationCap, Backpack, Presentation, ShieldCheck, BookOpen, Clock, Palette, Trophy } from 'lucide-react';
 
 // 랜딩 공지 — 비로그인 공개 정보 (신청기간·접수상태·관리자 공지문)
 interface Landing {
@@ -53,28 +53,54 @@ export default function Login() {
     <div className="flex min-h-full flex-col lg:flex-row">
       {/* Brand panel — 학생 대상 안내 */}
       <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-12 text-white lg:flex">
-        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10" />
-        <div className="absolute -bottom-24 -left-16 h-80 w-80 rounded-full bg-white/5" />
+        {/* 살아있는 배경 블롭 */}
+        <div className="animate-blob absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10" />
+        <div className="animate-blob absolute -bottom-24 -left-16 h-80 w-80 rounded-full bg-white/5" style={{ animationDelay: '-7s' }} />
+        <div className="animate-blob absolute right-1/4 top-1/2 h-40 w-40 rounded-full bg-brand-400/20 blur-2xl" style={{ animationDelay: '-3s' }} />
+
+        {/* 떠다니는 교과 아이콘 */}
+        <div className="animate-float absolute right-16 top-24 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm">
+          <BookOpen size={26} className="text-white/80" />
+        </div>
+        <div className="animate-float absolute bottom-40 right-28 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm" style={{ animationDelay: '-1.8s' }}>
+          <Palette size={22} className="text-white/80" />
+        </div>
+        <div className="animate-float absolute bottom-24 left-16 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur-sm" style={{ animationDelay: '-3.5s' }}>
+          <Trophy size={22} className="text-white/80" />
+        </div>
+
         <div className="relative max-w-lg">
-          <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+          <div className="anim-fade-up mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
             <GraduationCap size={34} />
           </div>
-          <h1 className="text-4xl font-bold leading-snug">
+          <h1 className="anim-fade-up anim-delay-1 text-4xl font-bold leading-snug">
             우리 학교 방과후학교,
             <br />
             온라인으로 신청하세요
           </h1>
-          <p className="mt-5 text-lg leading-relaxed text-brand-100">
+          <p className="anim-fade-up anim-delay-2 mt-5 text-lg leading-relaxed text-brand-100">
             교실에서 줄 서지 않아도 됩니다.
             <br />
             원하는 강좌를 골라 클릭 한 번으로 신청 완료.
           </p>
-          <ul className="mt-10 space-y-4 text-base text-brand-50">
+          <ul className="anim-fade-up anim-delay-3 mt-10 space-y-4 text-base text-brand-50">
             <li className="flex items-center gap-3"><Dot /> 선착순 신청 · 남은 자리 실시간 확인</li>
             <li className="flex items-center gap-3"><Dot /> 시간표 충돌·대상 학년 자동 검사로 안전한 신청</li>
             <li className="flex items-center gap-3"><Dot /> 내 수강신청과 교시별 시간표를 한눈에</li>
             <li className="flex items-center gap-3"><Dot /> 강좌 소개와 강의계획서 미리 보기</li>
           </ul>
+
+          {/* 신청 완료 카드 목업 — 서비스 분위기 전달 */}
+          <div className="anim-fade-up anim-delay-4 mt-10 flex items-center gap-3 rounded-2xl bg-white/10 px-5 py-4 ring-1 ring-white/15 backdrop-blur-sm">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/90 text-white">
+              <Check size={20} strokeWidth={3} />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold">수강신청이 완료되었습니다</div>
+              <div className="truncate text-xs text-brand-100">방송 댄스 · 금7~9 · 무용실</div>
+            </div>
+            <Clock size={18} className="ml-auto shrink-0 text-white/50" />
+          </div>
         </div>
       </div>
 
@@ -90,7 +116,7 @@ export default function Login() {
 
           {/* 공지 — 수강신청 기간·접수 상태 + 관리자 안내문 */}
           {landing && (landing.registration_start || landing.registration_end || landing.notice) && (
-            <div className="card mb-4 p-5">
+            <div className="card anim-fade-up mb-4 p-5">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-bold text-slate-800">📢 {landing.semester.name} 수강신청 안내</h3>
                 <span className={`badge shrink-0 ${landing.registration_open ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
@@ -108,7 +134,7 @@ export default function Login() {
             </div>
           )}
 
-          <div className="card p-8">
+          <div className="card anim-fade-up anim-delay-1 p-8">
             <h2 className="text-2xl font-bold text-slate-900">로그인</h2>
             <p className="mt-1.5 text-base text-slate-500">이용 유형을 선택하고 로그인하세요.</p>
 

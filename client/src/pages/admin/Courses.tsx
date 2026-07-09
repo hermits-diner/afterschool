@@ -112,7 +112,8 @@ export default function AdminCourses() {
         const parts = (line.includes('\t') ? line.split('\t') : line.split(','))
           .map((p) => p.trim())
           .map((p) => (p === '-' ? '' : p));
-        const [title, teacher, category, group, capacity, grades, payRate] = parts;
+        // 열 순서: 강좌 관리 목록과 동일 — 학년, 교과군, 강좌명, 강사, 교과, 정원, [회당강사료]
+        const [grades, group, title, teacher, category, capacity, payRate] = parts;
         const err = (msg: string) => errors.push(`${idx + 1}행: ${msg}`);
         if (!title) return err('강좌명이 없습니다.');
         if (!group) return err(`'${title}' — 교과군이 없습니다.`);
@@ -170,6 +171,19 @@ export default function AdminCourses() {
 
   const selectedCourses = (courses || []).filter((c) => selected.has(c.id));
   const selectedEnrollments = selectedCourses.reduce((sum, c) => sum + c.enrolled_count, 0);
+
+  // 목록 정렬: 학년(전학년 먼저) → 교과군 이름 → 강좌명
+  const sorted = useMemo(() => {
+    if (!courses) return [];
+    const gradeKey = (c: Course) =>
+      c.target_grades && c.target_grades.length ? Math.min(...c.target_grades) : 0;
+    return [...courses].sort(
+      (a, b) =>
+        gradeKey(a) - gradeKey(b) ||
+        (a.group_name || '힣').localeCompare(b.group_name || '힣', 'ko') ||
+        a.title.localeCompare(b.title, 'ko')
+    );
+  }, [courses]);
 
   async function bulkDelete() {
     if (delConfirm !== '삭제') return;
@@ -349,17 +363,18 @@ export default function AdminCourses() {
                   <th className="th w-10">
                     <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
                   </th>
+                  <th className="th">학년</th>
+                  <th className="th">교과군</th>
                   <th className="th">강좌명</th>
                   <th className="th">강사</th>
                   <th className="th">시간</th>
-                  <th className="th">대상</th>
                   <th className="th">정원</th>
                   <th className="th">상태</th>
                   <th className="th text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {courses.map((c) => (
+                {sorted.map((c) => (
                   <tr key={c.id} className={`hover:bg-slate-50 ${selected.has(c.id) ? 'bg-brand-50/50' : ''}`}>
                     <td className="td">
                       <input
@@ -369,6 +384,14 @@ export default function AdminCourses() {
                         onChange={() => toggleOne(c.id)}
                       />
                     </td>
+                    <td className="td whitespace-nowrap">{targetGradesLabel(c.target_grades)}</td>
+                    <td className="td whitespace-nowrap">
+                      {c.group_name ? (
+                        <span className="badge bg-brand-50 text-brand-700">{c.group_name}</span>
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
+                    </td>
                     <td className="td">
                       <div className="flex items-center gap-2">
                         <CategoryBadge category={c.category} />
@@ -377,13 +400,9 @@ export default function AdminCourses() {
                     </td>
                     <td className="td">{c.teacher_name}</td>
                     <td className="td whitespace-nowrap">
-                      {c.group_name && (
-                        <span className="badge mr-1.5 bg-brand-50 text-brand-700">{c.group_name}</span>
-                      )}
                       {c.schedule_label}
                       {c.room && <span className="text-slate-400"> · {c.room}</span>}
                     </td>
-                    <td className="td whitespace-nowrap">{targetGradesLabel(c.target_grades)}</td>
                     <td className="td">
                       <button onClick={() => openRoster(c)} className="group w-24">
                         <div className="mb-1 flex justify-between text-xs">
@@ -517,18 +536,18 @@ export default function AdminCourses() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 강좌씩 <b>강좌명, 강사, 교과, 교과군, 정원, [대상학년], [회당강사료]</b> 순서로 입력하세요.
+              한 줄에 한 강좌씩 <b>학년, 교과군, 강좌명, 강사, 교과, 정원, [회당강사료]</b> 순서로 입력하세요.
               쉼표 또는 탭(엑셀 붙여넣기) 구분이며, 생략할 항목은 <b>-</b>로 채웁니다.
-              <br />강사는 <b>아이디 또는 이름</b>, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b> 적습니다.
-              대상학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 비우면 전학년입니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
+              <br />학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 <b>-</b>는 전학년, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b>,
+              강사는 <b>아이디 또는 이름</b>으로 적습니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
               <div className="mt-1 font-mono text-xs text-slate-500">
-                문학의 밤, 김국어, 국어, A유형, 20, 12, 40000<br />
-                방송댄스, -, 기타, B유형, 25 <span className="text-slate-400">← 강사 미배정 · 전학년</span>
+                12, A유형, 문학의 밤, 김국어, 국어, 20, 40000<br />
+                -, B유형, 방송댄스, -, 기타, 25 <span className="text-slate-400">← 전학년 · 강사 미배정</span>
               </div>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'문학의 밤, 김국어, 국어, A유형, 20, 12, 40000\n방송댄스, -, 기타, B유형, 25'}
+              placeholder={'12, A유형, 문학의 밤, 김국어, 국어, 20, 40000\n-, B유형, 방송댄스, -, 기타, 25'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
