@@ -45,9 +45,10 @@ export default function PrintClassStatus() {
               <thead>
                 <tr className="bg-slate-100">
                   <Th w="8%">번호</Th>
-                  <Th w="16%">이름</Th>
+                  <Th w="14%">이름</Th>
                   <Th>신청 강좌</Th>
-                  <Th w="10%">신청 수</Th>
+                  <Th w="9%">신청 수</Th>
+                  <Th w="14%">확인(서명)</Th>
                 </tr>
               </thead>
               <tbody>
@@ -59,6 +60,8 @@ export default function PrintClassStatus() {
                       <Td center>{s.name}</Td>
                       <Td>{courses.length ? courses.join(', ') : <b>미신청</b>}</Td>
                       <Td center>{s.enrollments.length}</Td>
+                      {/* 학생 서명 공란 */}
+                      <Td center>{' '}</Td>
                     </tr>
                   );
                 })}
