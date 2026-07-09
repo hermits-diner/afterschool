@@ -51,13 +51,22 @@ router.get('/class-status', ah(async (req, res) => {
     "SELECT id, name, grade, class_no, student_no FROM users WHERE role='student' AND active=1 ORDER BY grade, class_no, student_no"
   );
   const enrolls = await all(
-    `SELECT e.student_id, e.status, c.title FROM enrollments e JOIN courses c ON c.id = e.course_id
+    `SELECT e.student_id, e.status, c.title, t.name AS teacher_name, g.name AS group_name
+     FROM enrollments e
+     JOIN courses c ON c.id = e.course_id
+     LEFT JOIN users t ON t.id = c.teacher_id
+     LEFT JOIN course_groups g ON g.id = c.group_id
      WHERE c.semester = ? AND e.status != 'cancelled' ORDER BY c.title`,
     [semester]
   );
   const byStudent = {};
   for (const e of enrolls) {
-    (byStudent[e.student_id] ||= []).push({ title: e.title, status: e.status });
+    (byStudent[e.student_id] ||= []).push({
+      title: e.title,
+      status: e.status,
+      teacher_name: e.teacher_name || '미배정',
+      group_name: e.group_name || null,
+    });
   }
   const classMap = new Map();
   for (const s of students) {

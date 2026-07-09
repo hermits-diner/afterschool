@@ -9,7 +9,17 @@ export interface ClassStudent {
   grade: number;
   class_no: number;
   student_no: number;
-  enrollments: { title: string; status: 'enrolled' | 'waitlisted' }[];
+  enrollments: {
+    title: string;
+    status: 'enrolled' | 'waitlisted';
+    teacher_name?: string;
+    group_name?: string | null;
+  }[];
+}
+
+// '강좌명 · 교과군 · 강사' 표기
+export function enrollmentLabel(e: ClassStudent['enrollments'][number]) {
+  return [e.title, e.group_name, e.teacher_name].filter(Boolean).join(' · ');
 }
 
 export interface ClassInfo {
@@ -127,7 +137,7 @@ export default function AdminClassStatus() {
                                     e.status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                                   }`}
                                 >
-                                  {e.title}
+                                  {enrollmentLabel(e)}
                                   {e.status === 'waitlisted' && ' (대기)'}
                                 </span>
                               ))}

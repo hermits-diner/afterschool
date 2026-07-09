@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
+import { enrollmentLabel } from './ClassStatus';
 import type { ClassInfo, ClassStudent } from './ClassStatus';
 
 // 반별 수강신청 현황 인쇄 — grade/classNo가 'all'이면 전체 반을 페이지 나눠 출력.
@@ -52,8 +53,8 @@ export default function PrintClassStatus() {
               </thead>
               <tbody>
                 {c.students.map((s) => {
-                  const enrolled = s.enrollments.filter((e) => e.status === 'enrolled').map((e) => e.title);
-                  const waitlisted = s.enrollments.filter((e) => e.status === 'waitlisted').map((e) => e.title);
+                  const enrolled = s.enrollments.filter((e) => e.status === 'enrolled').map(enrollmentLabel);
+                  const waitlisted = s.enrollments.filter((e) => e.status === 'waitlisted').map(enrollmentLabel);
                   return (
                     <tr key={s.id}>
                       <Td center>{s.student_no}</Td>
