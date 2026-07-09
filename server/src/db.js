@@ -112,6 +112,14 @@ const SCHEMA = [
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS course_files (
+    course_id   INTEGER PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    filename    TEXT NOT NULL,
+    mime        TEXT,
+    size        INTEGER NOT NULL,
+    data        TEXT NOT NULL,              -- base64 (강의계획서, 최대 5MB)
+    uploaded_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
   `CREATE TABLE IF NOT EXISTS login_attempts (
     username     TEXT PRIMARY KEY,
     fails        INTEGER NOT NULL DEFAULT 0,
@@ -125,6 +133,7 @@ const SCHEMA = [
     registration_start TEXT,
     registration_end   TEXT,
     max_courses_per_student INTEGER NOT NULL DEFAULT 3,
+    default_sessions INTEGER NOT NULL DEFAULT 16,   -- 기본 계획 차시 (강사 개설 시 자동 적용)
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
   'CREATE INDEX IF NOT EXISTS idx_courses_semester ON courses(semester)',
@@ -159,6 +168,9 @@ export async function initSchema() {
     .catch(() => {});
   await client
     .execute('ALTER TABLE courses ADD COLUMN planned_sessions INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
+  await client
+    .execute('ALTER TABLE semesters ADD COLUMN default_sessions INTEGER NOT NULL DEFAULT 16')
     .catch(() => {});
   await batch(
     Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({

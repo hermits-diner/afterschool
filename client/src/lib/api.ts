@@ -37,6 +37,7 @@ export interface Course {
   waitlisted_count: number;
   seats_left: number;
   is_full: boolean;
+  syllabus_filename?: string | null;
   // present on student "mine" responses
   enrollment_id?: number;
   enrollment_status?: 'enrolled' | 'waitlisted' | 'cancelled';
@@ -77,6 +78,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(body?.error || '요청을 처리하지 못했습니다.', res.status);
   }
   return body as T;
+}
+
+// File → base64 payload (data URL prefix 제거)
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// Authenticated file download → browser save
+export async function downloadCourseFile(courseId: number, filename: string) {
+  const token = getToken();
+  const res = await fetch(`/api/courses/${courseId}/syllabus`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
+  });
+  if (!res.ok) throw new ApiError('다운로드에 실패했습니다.', res.status);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export const api = {

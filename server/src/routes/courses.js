@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSetting } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
-import { decorateCourse, decorateCourses } from '../logic.js';
+import { decorateCourse, decorateCourses, getActiveSemester } from '../logic.js';
 
 const router = Router();
 
@@ -97,6 +97,8 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
   if (req.user.role === 'teacher') {
     d.teacher_id = req.user.id; // 강사는 본인 강좌만
     d.pay_rate = 0; // 강사료 단가는 관리자가 책정
+    d.fee = 0; // 수강료는 관리자가 책정
+    d.planned_sessions = (await getActiveSemester()).default_sessions ?? 16; // 세션 기본 계획 차시 자동 적용
   }
   if (d.start_time >= d.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
@@ -127,6 +129,8 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   if (req.user.role === 'teacher') {
     merged.teacher_id = existing.teacher_id; // 담당 강사 변경은 관리자만
     merged.pay_rate = existing.pay_rate; // 강사료 단가 변경도 관리자만
+    merged.fee = existing.fee; // 수강료 변경도 관리자만
+    merged.planned_sessions = existing.planned_sessions; // 계획 차시 조정도 관리자만
   }
   if (merged.start_time >= merged.end_time) {
     return res.status(400).json({ error: '종료 시간은 시작 시간보다 늦어야 합니다.' });
@@ -166,6 +170,65 @@ router.delete('/:id', authRequired, requireRole('admin'), ah(async (req, res) =>
     { sql: 'DELETE FROM enrollments WHERE course_id = ?', args: [course.id] },
     { sql: 'DELETE FROM courses WHERE id = ?', args: [course.id] },
   ]);
+  res.json({ ok: true });
+}));
+
+/* ---------------- 강의계획서 첨부 ---------------- */
+const MAX_SYLLABUS_BYTES = 5 * 1024 * 1024; // 5MB
+
+async function canManageCourse(req, courseId) {
+  const course = await get('SELECT * FROM courses WHERE id = ?', [courseId]);
+  if (!course) return { error: 404 };
+  if (req.user.role !== 'admin' && course.teacher_id !== req.user.id) return { error: 403 };
+  return { course };
+}
+
+// Upload/replace syllabus (owner teacher or admin). Body: {filename, mime, data(base64)}
+router.post('/:id/syllabus', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
+  const { error } = await canManageCourse(req, req.params.id);
+  if (error === 404) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  if (error === 403) return res.status(403).json({ error: '담당 강좌만 첨부할 수 있습니다.' });
+
+  const schema = z.object({
+    filename: z.string().min(1).max(200),
+    mime: z.string().max(100).optional(),
+    data: z.string().min(1), // base64
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '첨부파일 데이터가 올바르지 않습니다.' });
+  const size = Math.floor((parsed.data.data.length * 3) / 4);
+  if (size > MAX_SYLLABUS_BYTES) {
+    return res.status(400).json({ error: '강의계획서는 5MB 이하 파일만 첨부할 수 있습니다.' });
+  }
+  await run(
+    `INSERT INTO course_files (course_id, filename, mime, size, data, uploaded_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(course_id) DO UPDATE SET
+       filename = excluded.filename, mime = excluded.mime, size = excluded.size,
+       data = excluded.data, uploaded_at = excluded.uploaded_at`,
+    [req.params.id, parsed.data.filename, parsed.data.mime || 'application/octet-stream', size, parsed.data.data]
+  );
+  res.status(201).json({ ok: true, filename: parsed.data.filename });
+}));
+
+// Download syllabus (any authenticated user — 학생도 열람 가능)
+router.get('/:id/syllabus', authRequired, ah(async (req, res) => {
+  const file = await get('SELECT * FROM course_files WHERE course_id = ?', [req.params.id]);
+  if (!file) return res.status(404).json({ error: '첨부된 강의계획서가 없습니다.' });
+  res.setHeader('Content-Type', file.mime || 'application/octet-stream');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename*=UTF-8''${encodeURIComponent(file.filename)}`
+  );
+  res.send(Buffer.from(file.data, 'base64'));
+}));
+
+// Remove syllabus (owner teacher or admin)
+router.delete('/:id/syllabus', authRequired, requireRole('admin', 'teacher'), ah(async (req, res) => {
+  const { error } = await canManageCourse(req, req.params.id);
+  if (error === 404) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  if (error === 403) return res.status(403).json({ error: '담당 강좌만 삭제할 수 있습니다.' });
+  await run('DELETE FROM course_files WHERE course_id = ?', [req.params.id]);
   res.json({ ok: true });
 }));
 

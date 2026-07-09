@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api, Course, User, ApiError } from '../../lib/api';
+import { api, Course, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { CATEGORIES, DAYS, targetGradeLabel, formatFee, studentLabel } from '../../lib/format';
+import PeriodPicker from '../../components/PeriodPicker';
+import { CATEGORIES, targetGradeLabel, formatFee, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
+
+const MAX_FILE = 5 * 1024 * 1024;
 
 type Form = {
   title: string;
@@ -28,8 +31,8 @@ const emptyForm: Form = {
   teacher_id: null,
   capacity: 20,
   day_of_week: '월',
-  start_time: '16:00',
-  end_time: '17:30',
+  start_time: '',
+  end_time: '',
   room: '',
   target_grade: 0,
   fee: 0,
@@ -44,6 +47,7 @@ export default function AdminCourses() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
+  const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [rosterCourse, setRosterCourse] = useState<Course | null>(null);
   const [roster, setRoster] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
@@ -60,6 +64,7 @@ export default function AdminCourses() {
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
+    setSyllabusFile(null);
     setModalOpen(true);
   }
   function openEdit(c: Course) {
@@ -79,20 +84,31 @@ export default function AdminCourses() {
       pay_rate: c.pay_rate || 0,
       planned_sessions: c.planned_sessions || 0,
     });
+    setSyllabusFile(null);
     setModalOpen(true);
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.start_time || !form.end_time) {
+      return toast('시간표에서 수업 교시를 선택하세요.', 'error');
+    }
+    if (syllabusFile && syllabusFile.size > MAX_FILE) {
+      return toast('강의계획서는 5MB 이하 파일만 첨부할 수 있습니다.', 'error');
+    }
     setSaving(true);
     try {
-      if (editing) {
-        await api.put(`/courses/${editing.id}`, form);
-        toast('강좌가 수정되었습니다.', 'success');
-      } else {
-        await api.post('/courses', form);
-        toast('강좌가 개설되었습니다.', 'success');
+      const r = editing
+        ? await api.put<{ course: Course }>(`/courses/${editing.id}`, form)
+        : await api.post<{ course: Course }>('/courses', form);
+      if (syllabusFile) {
+        await api.post(`/courses/${r.course.id}/syllabus`, {
+          filename: syllabusFile.name,
+          mime: syllabusFile.type || 'application/octet-stream',
+          data: await fileToBase64(syllabusFile),
+        });
       }
+      toast(editing ? '강좌가 수정되었습니다.' : '강좌가 개설되었습니다.', 'success');
       setModalOpen(false);
       load();
     } catch (err) {
@@ -100,6 +116,15 @@ export default function AdminCourses() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function removeSyllabus() {
+    if (!editing) return;
+    if (!confirm('첨부된 강의계획서를 삭제하시겠습니까?')) return;
+    await api.del(`/courses/${editing.id}/syllabus`);
+    toast('강의계획서가 삭제되었습니다.', 'success');
+    setEditing({ ...editing, syllabus_filename: null });
+    load();
   }
 
   async function changeStatus(c: Course, status: string) {
@@ -239,21 +264,12 @@ export default function AdminCourses() {
               </select>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label className="label">요일</label>
-              <select className="input" value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
-                {DAYS.map((d) => <option key={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">시작</label>
-              <input type="time" className="input" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">종료</label>
-              <input type="time" className="input" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
-            </div>
+          <div>
+            <label className="label">수업 시간 * — 시간표에서 교시 블록 선택 (학기중 8~9교시 · 방학중 1~4교시)</label>
+            <PeriodPicker
+              value={{ day_of_week: form.day_of_week, start_time: form.start_time, end_time: form.end_time }}
+              onChange={(v) => setForm({ ...form, ...v })}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
@@ -291,6 +307,23 @@ export default function AdminCourses() {
           <div>
             <label className="label">강좌 소개</label>
             <textarea className="input min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">강의계획서 첨부 (PDF·HWP·DOCX 등, 최대 5MB)</label>
+            {editing?.syllabus_filename && !syllabusFile && (
+              <div className="mb-2 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <button type="button" className="inline-flex items-center gap-1.5 text-brand-600 hover:underline" onClick={() => downloadCourseFile(editing.id, editing.syllabus_filename!)}>
+                  <Icons.download size={14} /> {editing.syllabus_filename}
+                </button>
+                <button type="button" className="text-xs text-rose-500 hover:underline" onClick={removeSyllabus}>삭제</button>
+              </div>
+            )}
+            <input
+              type="file"
+              className="input"
+              accept=".pdf,.hwp,.hwpx,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+              onChange={(e) => setSyllabusFile(e.target.files?.[0] || null)}
+            />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>취소</button>

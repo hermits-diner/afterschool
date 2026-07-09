@@ -11,6 +11,7 @@ interface Semester {
   registration_start: string | null;
   registration_end: string | null;
   max_courses_per_student: number;
+  default_sessions: number;
   is_active: boolean;
   course_count: number;
   enrollment_count: number;
@@ -22,6 +23,7 @@ const emptyForm = {
   registration_start: '',
   registration_end: '',
   max_courses_per_student: 3,
+  default_sessions: 16,
   registration_open: true,
 };
 
@@ -54,6 +56,7 @@ export default function AdminSettings() {
       registration_start: s.registration_start || '',
       registration_end: s.registration_end || '',
       max_courses_per_student: s.max_courses_per_student,
+      default_sessions: s.default_sessions ?? 16,
       registration_open: s.registration_open === 'true',
     });
     setModalOpen(true);
@@ -69,6 +72,7 @@ export default function AdminSettings() {
         registration_start: form.registration_start || null,
         registration_end: form.registration_end || null,
         max_courses_per_student: Number(form.max_courses_per_student),
+        default_sessions: Number(form.default_sessions),
         registration_open: form.registration_open,
       };
       if (editing) {
@@ -149,6 +153,7 @@ export default function AdminSettings() {
                   <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500">
                     <span>신청기간 {s.registration_start || '-'} ~ {s.registration_end || '-'}</span>
                     <span>1인 최대 {s.max_courses_per_student}과목</span>
+                    <span>기본 {s.default_sessions ?? 16}차시</span>
                     <span className="font-medium text-slate-700">강좌 {s.course_count}개 · 신청 {s.enrollment_count}건</span>
                   </div>
                 </div>
@@ -206,10 +211,14 @@ export default function AdminSettings() {
               <input type="date" className="input" value={form.registration_end} onChange={(e) => setForm({ ...form, registration_end: e.target.value })} />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="label">1인당 최대 신청 강좌 수</label>
               <input type="number" min={1} className="input" value={form.max_courses_per_student} onChange={(e) => setForm({ ...form, max_courses_per_student: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">기본 계획 차시</label>
+              <input type="number" min={0} className="input" value={form.default_sessions} onChange={(e) => setForm({ ...form, default_sessions: e.target.value })} />
             </div>
             <div className="flex items-end pb-1">
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">

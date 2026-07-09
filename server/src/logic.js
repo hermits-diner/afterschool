@@ -14,6 +14,7 @@ export async function getActiveSemester() {
     registration_start: await getSetting('registration_start'),
     registration_end: await getSetting('registration_end'),
     max_courses_per_student: Number((await getSetting('max_courses_per_student')) || 3),
+    default_sessions: 16,
   };
 }
 
@@ -147,6 +148,12 @@ export async function decorateCourses(courses) {
     : [];
   const teacherMap = Object.fromEntries(teachers.map((t) => [t.id, t.name]));
 
+  const files = await all(
+    `SELECT course_id, filename FROM course_files WHERE course_id IN (${ph})`,
+    ids
+  );
+  const fileMap = Object.fromEntries(files.map((f) => [f.course_id, f.filename]));
+
   return courses.map((course) => {
     const enrolled = enrolledMap[course.id] || 0;
     return {
@@ -156,6 +163,7 @@ export async function decorateCourses(courses) {
       waitlisted_count: waitlistedMap[course.id] || 0,
       seats_left: Math.max(0, course.capacity - enrolled),
       is_full: enrolled >= course.capacity,
+      syllabus_filename: fileMap[course.id] || null,
     };
   });
 }

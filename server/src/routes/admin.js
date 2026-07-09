@@ -137,6 +137,7 @@ const semesterSchema = z.object({
   registration_start: z.string().optional().nullable(),
   registration_end: z.string().optional().nullable(),
   max_courses_per_student: z.union([z.number(), z.string()]).optional(),
+  default_sessions: z.union([z.number(), z.string()]).optional(),
 });
 
 // List all semesters with per-semester course/enrollment counts.
@@ -168,8 +169,8 @@ router.post('/semesters', ah(async (req, res) => {
   const dupe = await get('SELECT code FROM semesters WHERE code = ?', [d.code]);
   if (dupe) return res.status(409).json({ error: '이미 존재하는 세션 코드입니다.' });
   await run(
-    `INSERT INTO semesters (code, name, registration_open, registration_start, registration_end, max_courses_per_student)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO semesters (code, name, registration_open, registration_start, registration_end, max_courses_per_student, default_sessions)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       d.code,
       d.name || semesterName(d.code),
@@ -177,6 +178,7 @@ router.post('/semesters', ah(async (req, res) => {
       d.registration_start || null,
       d.registration_end || null,
       Number(d.max_courses_per_student || 3),
+      Number(d.default_sessions || 16),
     ]
   );
   const row = await get('SELECT * FROM semesters WHERE code = ?', [d.code]);
@@ -204,11 +206,13 @@ router.put('/semesters/:code', ah(async (req, res) => {
       d.max_courses_per_student !== undefined
         ? Number(d.max_courses_per_student)
         : existing.max_courses_per_student,
+    default_sessions:
+      d.default_sessions !== undefined ? Number(d.default_sessions) : existing.default_sessions,
   };
   await run(
-    `UPDATE semesters SET name=?, registration_open=?, registration_start=?, registration_end=?, max_courses_per_student=?
+    `UPDATE semesters SET name=?, registration_open=?, registration_start=?, registration_end=?, max_courses_per_student=?, default_sessions=?
      WHERE code=?`,
-    [merged.name, merged.registration_open, merged.registration_start, merged.registration_end, merged.max_courses_per_student, existing.code]
+    [merged.name, merged.registration_open, merged.registration_start, merged.registration_end, merged.max_courses_per_student, merged.default_sessions, existing.code]
   );
   res.json({ semester: await get('SELECT * FROM semesters WHERE code = ?', [existing.code]) });
 }));

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { api, Course, ApiError } from '../../lib/api';
+import { api, Course, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
 import { Modal, Spinner, EmptyState, CategoryBadge, StatusBadge, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { CATEGORIES, DAYS, targetGradeLabel, formatFee } from '../../lib/format';
+import PeriodPicker from '../../components/PeriodPicker';
+import { CATEGORIES, targetGradeLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 type Form = {
@@ -15,8 +16,6 @@ type Form = {
   end_time: string;
   room: string;
   target_grade: number;
-  fee: number;
-  planned_sessions: number;
 };
 
 const emptyForm: Form = {
@@ -25,13 +24,13 @@ const emptyForm: Form = {
   description: '',
   capacity: 20,
   day_of_week: '월',
-  start_time: '16:00',
-  end_time: '17:30',
+  start_time: '',
+  end_time: '',
   room: '',
   target_grade: 0,
-  fee: 0,
-  planned_sessions: 16,
 };
+
+const MAX_FILE = 5 * 1024 * 1024;
 
 export default function TeacherCourses() {
   const toast = useToast();
@@ -39,6 +38,7 @@ export default function TeacherCourses() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Course | null>(null);
   const [form, setForm] = useState<Form>(emptyForm);
+  const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [annCourse, setAnnCourse] = useState<Course | null>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -57,6 +57,7 @@ export default function TeacherCourses() {
   function openCreate() {
     setEditing(null);
     setForm(emptyForm);
+    setSyllabusFile(null);
     setModalOpen(true);
   }
   function openEdit(c: Course) {
@@ -71,23 +72,32 @@ export default function TeacherCourses() {
       end_time: c.end_time,
       room: c.room || '',
       target_grade: c.target_grade,
-      fee: c.fee,
-      planned_sessions: c.planned_sessions || 0,
     });
+    setSyllabusFile(null);
     setModalOpen(true);
   }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.start_time || !form.end_time) {
+      return toast('시간표에서 수업 교시를 선택하세요.', 'error');
+    }
+    if (syllabusFile && syllabusFile.size > MAX_FILE) {
+      return toast('강의계획서는 5MB 이하 파일만 첨부할 수 있습니다.', 'error');
+    }
     setSaving(true);
     try {
-      if (editing) {
-        await api.put(`/courses/${editing.id}`, form);
-        toast('강좌가 수정되었습니다.', 'success');
-      } else {
-        await api.post('/courses', form);
-        toast('강좌가 개설되었습니다. 학생들이 바로 신청할 수 있습니다.', 'success');
+      const r = editing
+        ? await api.put<{ course: Course }>(`/courses/${editing.id}`, form)
+        : await api.post<{ course: Course }>('/courses', form);
+      if (syllabusFile) {
+        await api.post(`/courses/${r.course.id}/syllabus`, {
+          filename: syllabusFile.name,
+          mime: syllabusFile.type || 'application/octet-stream',
+          data: await fileToBase64(syllabusFile),
+        });
       }
+      toast(editing ? '강좌가 수정되었습니다.' : '강좌가 개설되었습니다.', 'success');
       setModalOpen(false);
       load();
     } catch (err) {
@@ -95,6 +105,15 @@ export default function TeacherCourses() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function removeSyllabus() {
+    if (!editing) return;
+    if (!confirm('첨부된 강의계획서를 삭제하시겠습니까?')) return;
+    await api.del(`/courses/${editing.id}/syllabus`);
+    toast('강의계획서가 삭제되었습니다.', 'success');
+    setEditing({ ...editing, syllabus_filename: null });
+    load();
   }
 
   async function changeStatus(c: Course, status: string) {
@@ -140,7 +159,7 @@ export default function TeacherCourses() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">내 강좌</h1>
-          <p className="text-sm text-slate-500">담당 강좌를 개설하고 정원·시간을 직접 관리합니다.</p>
+          <p className="text-sm text-slate-500">담당 강좌를 개설하고 정원·시간을 직접 관리합니다. 수강료·강사료·계획차시는 관리자가 책정합니다.</p>
         </div>
         <button className="btn-primary" onClick={openCreate}>
           <Icons.plus size={16} /> 강좌 개설
@@ -165,8 +184,16 @@ export default function TeacherCourses() {
                 <Info label="시간" value={`${c.day_of_week} ${c.start_time}~${c.end_time}`} />
                 <Info label="강의실" value={c.room || '-'} />
                 <Info label="대상" value={targetGradeLabel(c.target_grade)} />
-                <Info label="수강료" value={formatFee(c.fee)} />
+                <Info label="계획 차시" value={`${c.planned_sessions || 0}회`} />
               </dl>
+              {c.syllabus_filename && (
+                <button
+                  className="mb-3 inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline"
+                  onClick={() => downloadCourseFile(c.id, c.syllabus_filename!)}
+                >
+                  <Icons.download size={14} /> {c.syllabus_filename}
+                </button>
+              )}
               <div className="mb-1 flex justify-between text-xs text-slate-500">
                 <span>수강 인원</span>
                 <span className="font-semibold text-slate-700">{c.enrolled_count}/{c.capacity}명 {c.waitlisted_count > 0 && `(대기 ${c.waitlisted_count})`}</span>
@@ -195,7 +222,7 @@ export default function TeacherCourses() {
             <label className="label">강좌명 *</label>
             <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <div>
               <label className="label">교과</label>
               <select className="input" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
@@ -203,24 +230,8 @@ export default function TeacherCourses() {
               </select>
             </div>
             <div>
-              <label className="label">요일</label>
-              <select className="input" value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
-                {DAYS.map((d) => <option key={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
               <label className="label">강의실</label>
               <input className="input" value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} placeholder="예: 201호" />
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-4">
-            <div>
-              <label className="label">시작</label>
-              <input type="time" className="input" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">종료</label>
-              <input type="time" className="input" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
             </div>
             <div>
               <label className="label">정원</label>
@@ -236,19 +247,36 @@ export default function TeacherCourses() {
               </select>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label">수강료(원)</label>
-              <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
-            </div>
-            <div>
-              <label className="label">계획 차시(총 수업 횟수)</label>
-              <input type="number" min={0} className="input" value={form.planned_sessions} onChange={(e) => setForm({ ...form, planned_sessions: Number(e.target.value) })} placeholder="예: 16" />
-            </div>
+          <div>
+            <label className="label">수업 시간 * — 시간표에서 교시 블록 선택 (학기중 8~9교시 · 방학중 1~4교시)</label>
+            <PeriodPicker
+              value={{ day_of_week: form.day_of_week, start_time: form.start_time, end_time: form.end_time }}
+              onChange={(v) => setForm({ ...form, ...v })}
+            />
           </div>
           <div>
             <label className="label">강좌 소개</label>
-            <textarea className="input min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <textarea className="input min-h-[70px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">강의계획서 첨부 (PDF·HWP·DOCX 등, 최대 5MB)</label>
+            {editing?.syllabus_filename && !syllabusFile && (
+              <div className="mb-2 flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <button type="button" className="inline-flex items-center gap-1.5 text-brand-600 hover:underline" onClick={() => downloadCourseFile(editing.id, editing.syllabus_filename!)}>
+                  <Icons.download size={14} /> {editing.syllabus_filename}
+                </button>
+                <button type="button" className="text-xs text-rose-500 hover:underline" onClick={removeSyllabus}>삭제</button>
+              </div>
+            )}
+            <input
+              type="file"
+              className="input"
+              accept=".pdf,.hwp,.hwpx,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+              onChange={(e) => setSyllabusFile(e.target.files?.[0] || null)}
+            />
+            {editing?.syllabus_filename && syllabusFile && (
+              <p className="mt-1 text-xs text-amber-600">저장 시 기존 파일이 새 파일로 교체됩니다.</p>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>취소</button>

@@ -1,5 +1,29 @@
 export const CATEGORIES = ['국어', '영어', '수학', '사회', '과학', '기타'];
 export const DAYS = ['월', '화', '수', '목', '금'];
+
+// 1~9교시 (학기중 방과후: 8~9교시, 방학중: 1~4교시)
+export const PERIODS = [
+  { no: 1, start: '09:00', end: '09:50' },
+  { no: 2, start: '10:00', end: '10:50' },
+  { no: 3, start: '11:00', end: '11:50' },
+  { no: 4, start: '12:00', end: '12:50' },
+  { no: 5, start: '13:30', end: '14:20' },
+  { no: 6, start: '14:30', end: '15:20' },
+  { no: 7, start: '15:30', end: '16:20' },
+  { no: 8, start: '16:30', end: '17:20' },
+  { no: 9, start: '17:30', end: '18:20' },
+];
+
+// start/end 시간과 일치하는 교시 범위 [fromNo, toNo]를 찾는다 (없으면 null).
+export function periodsFromTimes(start?: string, end?: string): [number, number] | null {
+  const from = PERIODS.find((p) => p.start === start);
+  const to = PERIODS.find((p) => p.end === end);
+  return from && to && from.no <= to.no ? [from.no, to.no] : null;
+}
+
+export function periodLabel(from: number, to: number) {
+  return from === to ? `${from}교시` : `${from}~${to}교시`;
+}
 export const SEMESTER_LABEL = '2026학년도 1학기 방과후학교';
 
 // '1학년 2반 3번' — full student number label

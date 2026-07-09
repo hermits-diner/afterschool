@@ -78,18 +78,18 @@ export async function ensureSeed() {
 
   // Courses
   const courseDefs = [
-    { title: '수능 국어 독서 완성', category: '국어', teacher: 'teacher1', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '201호', target_grade: 3, fee: 0, description: '비문학 지문 분석과 독해력 향상을 위한 심화 과정입니다.' },
-    { title: '문학 감상과 서술형 대비', category: '국어', teacher: 'teacher1', capacity: 15, day_of_week: '수', start_time: '16:00', end_time: '17:30', room: '201호', target_grade: 2, fee: 0, description: '현대·고전 문학 작품을 감상하고 서술형 평가를 대비합니다.' },
-    { title: '실전 영어 독해 (수능 대비)', category: '영어', teacher: 'teacher2', capacity: 20, day_of_week: '화', start_time: '16:00', end_time: '17:30', room: '202호', target_grade: 3, fee: 0, description: '고난도 영어 지문 독해 전략과 어법을 다룹니다.' },
-    { title: '영어 회화 & 발표', category: '영어', teacher: 'teacher2', capacity: 12, day_of_week: '목', start_time: '16:00', end_time: '17:00', room: '어학실', target_grade: 0, fee: 0, description: '원어민 스타일 회화 연습과 영어 발표 훈련.' },
-    { title: '미적분 심화 문제풀이', category: '수학', teacher: 'teacher3', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '203호', target_grade: 2, fee: 0, description: '미적분 핵심 개념과 킬러 문항 풀이 전략.' },
-    { title: '수학 기초 개념 다지기', category: '수학', teacher: 'teacher3', capacity: 25, day_of_week: '금', start_time: '16:00', end_time: '17:30', room: '203호', target_grade: 1, fee: 0, description: '고1 수학 기초 개념을 탄탄하게 다지는 강좌.' },
-    { title: '물리 실험 탐구', category: '과학', teacher: 'teacher4', capacity: 16, day_of_week: '화', start_time: '16:00', end_time: '18:00', room: '물리실', target_grade: 0, fee: 5000, description: '직접 실험하며 배우는 물리 개념. 재료비 포함.' },
-    { title: '화학 II 심화', category: '과학', teacher: 'teacher4', capacity: 18, day_of_week: '목', start_time: '16:00', end_time: '17:30', room: '화학실', target_grade: 3, fee: 3000, description: '화학 반응과 평형을 심화 학습합니다.' },
-    { title: '한국사 능력시험 대비', category: '사회', teacher: 'teacher5', capacity: 20, day_of_week: '월', start_time: '16:00', end_time: '17:30', room: '204호', target_grade: 0, fee: 0, description: '한국사능력검정시험 심화 대비반. 기출 중심으로 정리합니다.' },
-    { title: '생활과 윤리 논술', category: '사회', teacher: 'teacher5', capacity: 15, day_of_week: '수', start_time: '16:00', end_time: '17:30', room: '204호', target_grade: 2, fee: 0, description: '윤리 쟁점을 논술형으로 훈련합니다.' },
-    { title: '농구 교실', category: '기타', teacher: 'teacher6', capacity: 20, day_of_week: '수', start_time: '16:30', end_time: '18:00', room: '체육관', target_grade: 0, fee: 0, description: '기초 드리블부터 팀 경기까지. 운동복 지참.' },
-    { title: '방송 댄스', category: '기타', teacher: 'teacher6', capacity: 15, day_of_week: '금', start_time: '16:30', end_time: '18:00', room: '무용실', target_grade: 0, fee: 0, description: '최신 안무를 배우고 함께 무대를 준비합니다.' },
+    { title: '수능 국어 독서 완성', category: '국어', teacher: 'teacher1', capacity: 20, day_of_week: '월', start_time: '16:30', end_time: '18:20', room: '201호', target_grade: 3, fee: 0, description: '비문학 지문 분석과 독해력 향상을 위한 심화 과정입니다.' },
+    { title: '문학 감상과 서술형 대비', category: '국어', teacher: 'teacher1', capacity: 15, day_of_week: '수', start_time: '16:30', end_time: '18:20', room: '201호', target_grade: 2, fee: 0, description: '현대·고전 문학 작품을 감상하고 서술형 평가를 대비합니다.' },
+    { title: '실전 영어 독해 (수능 대비)', category: '영어', teacher: 'teacher2', capacity: 20, day_of_week: '화', start_time: '16:30', end_time: '18:20', room: '202호', target_grade: 3, fee: 0, description: '고난도 영어 지문 독해 전략과 어법을 다룹니다.' },
+    { title: '영어 회화 & 발표', category: '영어', teacher: 'teacher2', capacity: 12, day_of_week: '목', start_time: '16:30', end_time: '17:20', room: '어학실', target_grade: 0, fee: 0, description: '원어민 스타일 회화 연습과 영어 발표 훈련.' },
+    { title: '미적분 심화 문제풀이', category: '수학', teacher: 'teacher3', capacity: 20, day_of_week: '월', start_time: '16:30', end_time: '18:20', room: '203호', target_grade: 2, fee: 0, description: '미적분 핵심 개념과 킬러 문항 풀이 전략.' },
+    { title: '수학 기초 개념 다지기', category: '수학', teacher: 'teacher3', capacity: 25, day_of_week: '금', start_time: '16:30', end_time: '18:20', room: '203호', target_grade: 1, fee: 0, description: '고1 수학 기초 개념을 탄탄하게 다지는 강좌.' },
+    { title: '물리 실험 탐구', category: '과학', teacher: 'teacher4', capacity: 16, day_of_week: '화', start_time: '16:30', end_time: '18:20', room: '물리실', target_grade: 0, fee: 5000, description: '직접 실험하며 배우는 물리 개념. 재료비 포함.' },
+    { title: '화학 II 심화', category: '과학', teacher: 'teacher4', capacity: 18, day_of_week: '목', start_time: '16:30', end_time: '18:20', room: '화학실', target_grade: 3, fee: 3000, description: '화학 반응과 평형을 심화 학습합니다.' },
+    { title: '한국사 능력시험 대비', category: '사회', teacher: 'teacher5', capacity: 20, day_of_week: '월', start_time: '16:30', end_time: '18:20', room: '204호', target_grade: 0, fee: 0, description: '한국사능력검정시험 심화 대비반. 기출 중심으로 정리합니다.' },
+    { title: '생활과 윤리 논술', category: '사회', teacher: 'teacher5', capacity: 15, day_of_week: '수', start_time: '16:30', end_time: '18:20', room: '204호', target_grade: 2, fee: 0, description: '윤리 쟁점을 논술형으로 훈련합니다.' },
+    { title: '농구 교실', category: '기타', teacher: 'teacher6', capacity: 20, day_of_week: '수', start_time: '16:30', end_time: '18:20', room: '체육관', target_grade: 0, fee: 0, description: '기초 드리블부터 팀 경기까지. 운동복 지참.' },
+    { title: '방송 댄스', category: '기타', teacher: 'teacher6', capacity: 15, day_of_week: '금', start_time: '16:30', end_time: '18:20', room: '무용실', target_grade: 0, fee: 0, description: '최신 안무를 배우고 함께 무대를 준비합니다.' },
   ];
 
   const courseIds = [];

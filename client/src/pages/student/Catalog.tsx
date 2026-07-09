@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, Course, ApiError } from '../../lib/api';
+import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
 import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../components/ui';
 import { CATEGORIES, DAYS, targetGradeLabel, formatFee, courseStatusLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
@@ -160,6 +160,15 @@ export default function StudentCatalog() {
               <Row label="정원" value={`${detail.enrolled_count} / ${detail.capacity}명`} />
               <Row label="대기 인원" value={`${detail.waitlisted_count}명`} />
             </dl>
+
+            {detail.syllabus_filename && (
+              <button
+                className="btn-secondary btn-sm mb-4"
+                onClick={() => downloadCourseFile(detail.id, detail.syllabus_filename!)}
+              >
+                <Icons.download size={14} /> 강의계획서 다운로드
+              </button>
+            )}
 
             {announcements.length > 0 && (
               <div className="mb-4">
