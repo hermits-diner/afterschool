@@ -114,12 +114,24 @@ export async function findScheduleConflict(studentId, course) {
   return null;
 }
 
+// 신청 기간 판정 — 분 단위 지원, 한국 시간(KST) 기준.
+// 값이 날짜만이면 시작일은 00:00부터, 종료일은 23:59까지로 해석.
 export async function isRegistrationOpen() {
   const s = await getActiveSemester();
   if (s.registration_open !== 'true') return false;
-  const today = new Date().toISOString().slice(0, 10);
-  if (s.registration_start && today < s.registration_start) return false;
-  if (s.registration_end && today > s.registration_end) return false;
+  const now = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 16); // 'YYYY-MM-DDTHH:MM' KST
+  const start = s.registration_start
+    ? s.registration_start.includes('T')
+      ? s.registration_start
+      : `${s.registration_start}T00:00`
+    : null;
+  const end = s.registration_end
+    ? s.registration_end.includes('T')
+      ? s.registration_end
+      : `${s.registration_end}T23:59`
+    : null;
+  if (start && now < start) return false;
+  if (end && now > end) return false;
   return true;
 }
 

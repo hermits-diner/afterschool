@@ -53,8 +53,12 @@ export default function AdminSettings() {
     setForm({
       code: s.code,
       name: s.name,
-      registration_start: s.registration_start || '',
-      registration_end: s.registration_end || '',
+      registration_start: s.registration_start
+        ? s.registration_start.includes('T') ? s.registration_start : `${s.registration_start}T00:00`
+        : '',
+      registration_end: s.registration_end
+        ? s.registration_end.includes('T') ? s.registration_end : `${s.registration_end}T23:59`
+        : '',
       max_courses_per_student: s.max_courses_per_student,
       default_sessions: s.default_sessions ?? 16,
       registration_open: s.registration_open === 'true',
@@ -151,7 +155,7 @@ export default function AdminSettings() {
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500">
-                    <span>신청기간 {s.registration_start || '-'} ~ {s.registration_end || '-'}</span>
+                    <span>신청기간 {(s.registration_start || '-').replace('T', ' ')} ~ {(s.registration_end || '-').replace('T', ' ')}</span>
                     <span>1인 최대 {s.max_courses_per_student}과목</span>
                     <span>기본 {s.default_sessions ?? 16}차시</span>
                     <span className="font-medium text-slate-700">강좌 {s.course_count}개 · 신청 {s.enrollment_count}건</span>
@@ -203,12 +207,12 @@ export default function AdminSettings() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">신청 시작일</label>
-              <input type="date" className="input" value={form.registration_start} onChange={(e) => setForm({ ...form, registration_start: e.target.value })} />
+              <label className="label">신청 시작 (날짜·시각)</label>
+              <input type="datetime-local" className="input" value={form.registration_start} onChange={(e) => setForm({ ...form, registration_start: e.target.value })} />
             </div>
             <div>
-              <label className="label">신청 종료일</label>
-              <input type="date" className="input" value={form.registration_end} onChange={(e) => setForm({ ...form, registration_end: e.target.value })} />
+              <label className="label">신청 종료 (날짜·시각)</label>
+              <input type="datetime-local" className="input" value={form.registration_end} onChange={(e) => setForm({ ...form, registration_end: e.target.value })} />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
