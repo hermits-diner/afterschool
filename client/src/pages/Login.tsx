@@ -62,7 +62,7 @@ export default function Login() {
         {/* 가독성 오버레이 */}
         <div className="absolute inset-0 bg-gradient-to-br from-brand-950/90 via-brand-900/70 to-brand-950/85" />
 
-        <div className="relative max-w-xl pb-16">
+        <div className="relative max-w-2xl pb-16">
           <div className="anim-fade-up mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
             <GraduationCap size={34} />
           </div>
@@ -80,26 +80,26 @@ export default function Login() {
           {/* 교과 학습 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
           <div className="anim-fade-up anim-delay-3 mt-12 flex items-end gap-4">
             <img
-              src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=400&q=75"
+              src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=600&q=75"
               alt="국어·독서"
-              className="animate-float h-40 w-32 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float h-56 w-44 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
             />
             <img
-              src="https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=400&q=75"
+              src="https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=600&q=75"
               alt="수학"
-              className="animate-float h-48 w-36 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float h-64 w-52 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
               style={{ animationDelay: '-1.2s' }}
             />
             <img
-              src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=400&q=75"
+              src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=75"
               alt="영어·학습"
-              className="animate-float h-40 w-32 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float h-56 w-44 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
               style={{ animationDelay: '-2.4s' }}
             />
             <img
-              src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=400&q=75"
+              src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&q=75"
               alt="과학 실험"
-              className="animate-float h-48 w-36 -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float h-64 w-52 -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
               style={{ animationDelay: '-3.6s' }}
             />
           </div>
