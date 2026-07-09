@@ -4,11 +4,14 @@ import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../co
 import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
+import { useRegistrationOpen } from '../../lib/useSemester';
 import { Icons } from '../../components/icons';
 
 export default function StudentCatalog() {
   const toast = useToast();
   const { user } = useAuth();
+  const regOpen = useRegistrationOpen();
+  const locked = regOpen === false; // 접수 마감 — 신청·취소 잠금
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [mineIds, setMineIds] = useState<Set<number>>(new Set());
   const [q, setQ] = useState('');
@@ -19,8 +22,10 @@ export default function StudentCatalog() {
   const [busy, setBusy] = useState<number | null>(null);
 
   async function load() {
+    // 내 학년이 신청할 수 있는 강좌만 조회 (전학년 강좌 포함)
+    const gradeParam = user?.grade ? `?grade=${user.grade}` : '';
     const [c, mine] = await Promise.all([
-      api.get<{ courses: Course[] }>('/courses'),
+      api.get<{ courses: Course[] }>(`/courses${gradeParam}`),
       api.get<{ courses: Course[] }>('/enrollments/mine'),
     ]);
     setCourses(c.courses);
@@ -40,11 +45,26 @@ export default function StudentCatalog() {
     });
   }, [courses, category, day, q]);
 
+  // 교과군별 그룹핑 — 교과군 이름순 정렬, 교과군 미지정 강좌는 마지막에
+  const grouped = useMemo(() => {
+    const map = new Map<string, Course[]>();
+    for (const c of filtered) {
+      const key = c.group_name || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    return [...map.entries()].sort(([a], [b]) => {
+      if (!a) return 1; // 미지정은 뒤로
+      if (!b) return -1;
+      return a.localeCompare(b, 'ko');
+    });
+  }, [filtered]);
+
   async function enroll(c: Course) {
     setBusy(c.id);
     try {
       const r = await api.post<{ message: string; status: string }>('/enrollments', { course_id: c.id });
-      toast(r.message, r.status === 'waitlisted' ? 'info' : 'success');
+      toast(r.message, 'success');
       setDetail(null);
       load();
     } catch (err) {
@@ -80,8 +100,15 @@ export default function StudentCatalog() {
     <div>
       <h1 className="mb-1 text-2xl font-bold text-slate-900">강좌 신청</h1>
       <p className="mb-6 text-sm text-slate-500">
-        원하는 방과후 강좌를 선착순으로 신청하세요. 정원 초과 시 대기자로 등록됩니다.
+        원하는 방과후 강좌를 선착순으로 신청하세요. 정원이 차면 신청이 마감됩니다.
+        {user?.grade ? ` (${user.grade}학년 신청 가능 강좌만 표시)` : ''}
       </p>
+
+      {locked && (
+        <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          🔒 수강신청이 마감되었습니다. 신청·취소 등 변경이 불가능합니다. 변경이 필요하면 방과후 담당 선생님께 문의하세요.
+        </div>
+      )}
 
       {/* Filters */}
       <div className="mb-5 flex flex-wrap gap-2">
@@ -99,8 +126,16 @@ export default function StudentCatalog() {
       {filtered.length === 0 ? (
         <EmptyState message="조건에 맞는 강좌가 없습니다." />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((c) => {
+        <div className="space-y-8">
+          {grouped.map(([groupName, groupCourses]) => (
+            <section key={groupName || '__none__'}>
+              <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-800">
+                <span className="inline-block h-4 w-1 rounded-full bg-brand-500" />
+                {groupName || '교과군 미지정'}
+                <span className="text-xs font-medium text-slate-400">{groupCourses.length}개 강좌</span>
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {groupCourses.map((c) => {
             const isMine = mineIds.has(c.id);
             const closed = c.status !== 'open';
             return (
@@ -120,7 +155,7 @@ export default function StudentCatalog() {
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="text-slate-500">정원 {c.enrolled_count}/{c.capacity}</span>
                     {c.is_full ? (
-                      <span className="font-medium text-rose-600">마감 (대기 {c.waitlisted_count})</span>
+                      <span className="font-medium text-rose-600">정원 마감</span>
                     ) : (
                       <span className="font-medium text-emerald-600">{c.seats_left}자리 남음</span>
                     )}
@@ -130,16 +165,21 @@ export default function StudentCatalog() {
                 <div className="flex gap-2">
                   <button className="btn-secondary btn-sm flex-1" onClick={() => openDetail(c)}>상세보기</button>
                   {isMine ? (
-                    <button className="btn-danger btn-sm flex-1" onClick={() => cancel(c)} disabled={busy === c.id}>취소</button>
+                    <button className="btn-danger btn-sm flex-1" onClick={() => cancel(c)} disabled={busy === c.id || locked}>
+                      {locked ? '마감' : '취소'}
+                    </button>
                   ) : (
-                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed}>
-                      {closed ? courseStatusLabel(c.status) : c.is_full ? '대기신청' : '신청'}
+                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed || c.is_full || locked}>
+                      {locked ? '마감' : closed ? courseStatusLabel(c.status) : c.is_full ? '정원 마감' : '신청'}
                     </button>
                   )}
                 </div>
               </div>
             );
           })}
+              </div>
+            </section>
+          ))}
         </div>
       )}
 
@@ -158,7 +198,7 @@ export default function StudentCatalog() {
               <Row label="강의실" value={detail.room || '미정'} />
               <Row label="수강료" value={formatFee(detail.fee)} />
               <Row label="정원" value={`${detail.enrolled_count} / ${detail.capacity}명`} />
-              <Row label="대기 인원" value={`${detail.waitlisted_count}명`} />
+              <Row label="잔여 좌석" value={detail.is_full ? '정원 마감' : `${detail.seats_left}자리`} />
             </dl>
 
             {detail.syllabus_filename && (
@@ -186,10 +226,12 @@ export default function StudentCatalog() {
 
             <div className="flex justify-end gap-2">
               {mineIds.has(detail.id) ? (
-                <button className="btn-danger" onClick={() => cancel(detail)} disabled={busy === detail.id}>수강 취소</button>
+                <button className="btn-danger" onClick={() => cancel(detail)} disabled={busy === detail.id || locked}>
+                  {locked ? '마감 (변경 불가)' : '수강 취소'}
+                </button>
               ) : (
-                <button className="btn-primary" onClick={() => enroll(detail)} disabled={busy === detail.id || detail.status !== 'open'}>
-                  {detail.is_full ? '대기자 신청' : '수강 신청'}
+                <button className="btn-primary" onClick={() => enroll(detail)} disabled={busy === detail.id || detail.status !== 'open' || detail.is_full || locked}>
+                  {locked ? '마감 (변경 불가)' : detail.is_full ? '정원 마감' : '수강 신청'}
                 </button>
               )}
             </div>

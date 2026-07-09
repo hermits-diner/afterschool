@@ -5,7 +5,6 @@ import { authRequired, requireRole, ah } from '../auth.js';
 import {
   findScheduleConflict,
   isRegistrationOpen,
-  promoteWaitlist,
   decorateCourses,
   getActiveSemester,
   parseTargetGrades,
@@ -33,7 +32,7 @@ router.get('/mine', authRequired, requireRole('student'), ah(async (req, res) =>
   res.json({ courses });
 }));
 
-// Student: enroll in a course (선착순 + 대기순번)
+// Student: enroll in a course (선착순 — 정원 마감 시 신청 거부)
 router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
   const schema = z.object({ course_id: z.number().int() });
   const parsed = schema.safeParse(req.body);
@@ -57,7 +56,7 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
     return res.status(400).json({ error: `${targetGrades.join('·')}학년 대상 강좌입니다.` });
   }
 
-  // already enrolled/waitlisted? (cancelled rows are revived below — UNIQUE constraint)
+  // already enrolled? (cancelled rows are revived below — UNIQUE constraint)
   const existing = await get(
     'SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?',
     [student.id, course.id]
@@ -71,7 +70,7 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
   const max = Number(semester.max_courses_per_student || 3);
   const activeRow = await get(
     `SELECT COUNT(*) AS c FROM enrollments e JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ? AND e.status IN ('enrolled','waitlisted')
+     WHERE e.student_id = ? AND e.status = 'enrolled'
        AND c.status != 'cancelled' AND c.semester = ?`,
     [student.id, semester.code]
   );
@@ -89,6 +88,7 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
 
   // Seat claim is atomic: the capacity check lives INSIDE the write statement,
   // so concurrent requests can never overshoot the capacity (선착순 동시성 보장).
+  // 대기자 기능 없음 — 정원이 차 있으면 신청을 거부한다.
   const seatGuard = `(SELECT COUNT(*) FROM enrollments WHERE course_id = ? AND status = 'enrolled') < ?`;
   let claimed;
   if (existing) {
@@ -101,11 +101,6 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
           [existing.id, course.id, course.capacity]
         )
       ).changes > 0;
-    if (!claimed) {
-      await run("UPDATE enrollments SET status = 'waitlisted', created_at = datetime('now') WHERE id = ?", [
-        existing.id,
-      ]);
-    }
   } else {
     claimed =
       (
@@ -115,18 +110,16 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
           [student.id, course.id, course.id, course.capacity]
         )
       ).changes > 0;
-    if (!claimed) {
-      await run("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'waitlisted')", [
-        student.id,
-        course.id,
-      ]);
-    }
+  }
+
+  if (!claimed) {
+    return res.status(400).json({ error: '정원이 초과되어 신청할 수 없습니다.' });
   }
 
   res.status(201).json({
     ok: true,
-    status: claimed ? 'enrolled' : 'waitlisted',
-    message: claimed ? '수강신청이 완료되었습니다.' : '정원이 초과되어 대기자로 등록되었습니다.',
+    status: 'enrolled',
+    message: '수강신청이 완료되었습니다.',
   });
 }));
 
@@ -142,9 +135,7 @@ router.delete('/:courseId', authRequired, requireRole('student'), ah(async (req,
     return res.status(403).json({ error: '수강신청 기간이 아니어서 취소할 수 없습니다.' });
   }
 
-  const wasEnrolled = enrollment.status === 'enrolled';
   await run("UPDATE enrollments SET status = 'cancelled' WHERE id = ?", [enrollment.id]);
-  if (wasEnrolled) await promoteWaitlist(enrollment.course_id);
   res.json({ ok: true, message: '수강신청이 취소되었습니다.' });
 }));
 

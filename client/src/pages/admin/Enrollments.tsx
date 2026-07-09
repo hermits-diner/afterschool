@@ -93,7 +93,6 @@ export default function AdminEnrollments() {
         <select className="input w-40" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">전체 상태</option>
           <option value="enrolled">수강확정</option>
-          <option value="waitlisted">대기</option>
         </select>
         <div className="ml-auto flex items-center text-sm text-slate-500">총 {filtered.length}건</div>
       </div>

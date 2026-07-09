@@ -69,7 +69,7 @@ export function roleLabel(role: string) {
 }
 
 export function enrollStatusLabel(s?: string) {
-  return { enrolled: '수강확정', waitlisted: '대기', cancelled: '취소' }[s || ''] || s || '';
+  return { enrolled: '수강확정', cancelled: '취소' }[s || ''] || s || '';
 }
 
 export function courseStatusLabel(s: string) {

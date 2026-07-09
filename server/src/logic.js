@@ -135,28 +135,6 @@ export async function isRegistrationOpen() {
   return true;
 }
 
-// When a seat frees up, promote the earliest waitlisted student to enrolled.
-// Each promotion is a single conditional UPDATE — capacity check and status
-// change happen atomically, so concurrent cancels/promotes can't overshoot.
-export async function promoteWaitlist(courseId) {
-  const course = await get('SELECT capacity FROM courses WHERE id = ?', [courseId]);
-  if (!course) return;
-  let promoted = true;
-  while (promoted) {
-    const r = await run(
-      `UPDATE enrollments SET status = 'enrolled'
-       WHERE id = (
-         SELECT id FROM enrollments
-         WHERE course_id = ? AND status = 'waitlisted'
-         ORDER BY created_at ASC, id ASC LIMIT 1
-       )
-       AND (SELECT COUNT(*) FROM enrollments WHERE course_id = ? AND status = 'enrolled') < ?`,
-      [courseId, courseId, course.capacity]
-    );
-    promoted = r.changes > 0;
-  }
-}
-
 // Serialize a user row for API responses (drops password hash).
 export function publicUser(u) {
   return {
@@ -175,8 +153,8 @@ export function publicUser(u) {
   };
 }
 
-// Active roster (enrolled first, then waitlisted) for a course.
-// orderBy 'student': 학년/반/번호 순 — class lists. 'created': 신청순 — 대기 순번 확인용.
+// Active roster (수강확정 학생) for a course.
+// orderBy 'student': 학년/반/번호 순 — class lists. 'created': 신청순.
 export async function getCourseRoster(courseId, orderBy = 'student') {
   const order =
     orderBy === 'created' ? 'e.created_at, e.id' : 'u.grade, u.class_no, u.student_no';
@@ -184,8 +162,8 @@ export async function getCourseRoster(courseId, orderBy = 'student') {
     `SELECT e.id AS enrollment_id, e.status, e.created_at,
             u.id AS student_id, u.name, u.grade, u.class_no, u.student_no, u.phone
      FROM enrollments e JOIN users u ON u.id = e.student_id
-     WHERE e.course_id = ? AND e.status != 'cancelled'
-     ORDER BY CASE e.status WHEN 'enrolled' THEN 0 ELSE 1 END, ${order}`,
+     WHERE e.course_id = ? AND e.status = 'enrolled'
+     ORDER BY ${order}`,
     [courseId]
   );
 }
@@ -286,16 +264,13 @@ export async function decorateCourses(courses) {
   const ph = ids.map(() => '?').join(',');
 
   const counts = await all(
-    `SELECT course_id, status, COUNT(*) AS c FROM enrollments
-     WHERE course_id IN (${ph}) AND status IN ('enrolled','waitlisted')
-     GROUP BY course_id, status`,
+    `SELECT course_id, COUNT(*) AS c FROM enrollments
+     WHERE course_id IN (${ph}) AND status = 'enrolled'
+     GROUP BY course_id`,
     ids
   );
   const enrolledMap = {};
-  const waitlistedMap = {};
-  for (const r of counts) {
-    (r.status === 'enrolled' ? enrolledMap : waitlistedMap)[r.course_id] = r.c;
-  }
+  for (const r of counts) enrolledMap[r.course_id] = r.c;
 
   const teacherIds = [...new Set(courses.map((c) => c.teacher_id).filter(Boolean))];
   const teachers = teacherIds.length
@@ -312,6 +287,16 @@ export async function decorateCourses(courses) {
   );
   const fileMap = Object.fromEntries(files.map((f) => [f.course_id, f.filename]));
 
+  // 교과군 이름 (강좌 목록을 교과군별로 묶어 보여줄 때 사용)
+  const groupIds = [...new Set(courses.map((c) => c.group_id).filter(Boolean))];
+  const groups = groupIds.length
+    ? await all(
+        `SELECT id, name FROM course_groups WHERE id IN (${groupIds.map(() => '?').join(',')})`,
+        groupIds
+      )
+    : [];
+  const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
+
   return courses.map((course) => {
     const enrolled = enrolledMap[course.id] || 0;
     return {
@@ -320,8 +305,8 @@ export async function decorateCourses(courses) {
       schedule_label: scheduleLabel(course),
       target_grades: parseTargetGrades(course),
       teacher_name: (course.teacher_id && teacherMap[course.teacher_id]) || '미배정',
+      group_name: (course.group_id && groupMap[course.group_id]) || null,
       enrolled_count: enrolled,
-      waitlisted_count: waitlistedMap[course.id] || 0,
       seats_left: Math.max(0, course.capacity - enrolled),
       is_full: enrolled >= course.capacity,
       syllabus_filename: fileMap[course.id] || null,

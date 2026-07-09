@@ -16,7 +16,6 @@ export default function StudentDashboard() {
 
   if (!mine) return <Spinner />;
   const enrolled = mine.filter((c) => c.enrollment_status === 'enrolled');
-  const waitlisted = mine.filter((c) => c.enrollment_status === 'waitlisted');
   const totalFee = enrolled.reduce((sum, c) => sum + c.fee, 0);
 
   return (
@@ -28,9 +27,8 @@ export default function StudentDashboard() {
         {user?.grade}학년 {user?.class_no}반 · 나의 방과후 수강 현황입니다.
       </p>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4">
         <Stat label="수강 확정" value={`${enrolled.length}과목`} accent="bg-brand-50 text-brand-600" icon={<Icons.book size={22} />} />
-        <Stat label="대기 중" value={`${waitlisted.length}과목`} accent="bg-amber-50 text-amber-600" icon={<Icons.clipboard size={22} />} />
         <Stat label="수강료 합계" value={formatFee(totalFee)} accent="bg-emerald-50 text-emerald-600" icon={<Icons.chart size={22} />} />
       </div>
 

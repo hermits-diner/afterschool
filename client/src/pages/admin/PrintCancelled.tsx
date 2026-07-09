@@ -48,7 +48,7 @@ export default function PrintCancelled() {
                 <Td center>{studentLabel(s.grade, s.class_no, s.student_no)}</Td>
                 <Td center>{s.name}</Td>
                 <Td>
-                  {s.courses.map((c) => cancelledCourseLabel(c) + (c.was_waitlisted ? ' (대기였음)' : '')).join(', ')}
+                  {s.courses.map((c) => cancelledCourseLabel(c)).join(', ')}
                 </Td>
                 <Td> </Td>
               </tr>

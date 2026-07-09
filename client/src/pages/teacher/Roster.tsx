@@ -29,8 +29,7 @@ export default function TeacherRoster() {
     });
   }, [selected]);
 
-  const enrolled = roster?.filter((r) => r.status === 'enrolled') || [];
-  const waitlisted = roster?.filter((r) => r.status === 'waitlisted') || [];
+  const enrolled = roster || [];
 
   return (
     <div>
@@ -67,7 +66,7 @@ export default function TeacherRoster() {
                   </div>
                   <span className="text-slate-500">{course.schedule_label}</span>
                   <span className="text-slate-500">{course.room}</span>
-                  <span className="font-semibold text-slate-700">수강 {enrolled.length}명 · 대기 {waitlisted.length}명</span>
+                  <span className="font-semibold text-slate-700">수강 {enrolled.length}명</span>
                   <button
                     className="btn-secondary btn-sm ml-auto"
                     onClick={() => window.open(`/teacher/print/roster/${course.id}`, '_blank')}
@@ -78,7 +77,6 @@ export default function TeacherRoster() {
               )}
 
               <RosterTable title="수강 확정" rows={enrolled} showContact />
-              {waitlisted.length > 0 && <RosterTable title="대기자" rows={waitlisted} />}
             </div>
           )}
         </>

@@ -20,3 +20,16 @@ export function useSemesterLabel() {
   }, []);
   return label;
 }
+
+// 수강신청 접수 여부 — 마감 시 학생 화면의 신청·취소 버튼을 잠근다.
+// null = 로딩 중 (버튼을 미리 잠그지 않도록 구분)
+export function useRegistrationOpen() {
+  const [open, setOpen] = useState<boolean | null>(null);
+  useEffect(() => {
+    api
+      .get<{ registration_open: boolean }>('/meta')
+      .then((r) => setOpen(r.registration_open))
+      .catch(() => setOpen(true)); // 조회 실패 시 서버 검증에 맡김
+  }, []);
+  return open;
+}

@@ -7,7 +7,7 @@ import fs from 'fs';
 
 import { ensureSeed } from './seed.js';
 import { authRequired, ah } from './auth.js';
-import { getActiveSemester } from './logic.js';
+import { getActiveSemester, isRegistrationOpen } from './logic.js';
 import { all } from './db.js';
 import authRoutes from './routes/auth.js';
 import courseRoutes from './routes/courses.js';
@@ -32,10 +32,13 @@ app.use(cookieParser());
 
 app.get('/api/health', (req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-// Active session info for header/print labels.
+// Active session info for header/print labels + 접수 상태 (학생 화면 마감 표시용).
 app.get('/api/meta', authRequired, ah(async (req, res) => {
   const s = await getActiveSemester();
-  res.json({ semester: { code: s.code, name: s.name } });
+  res.json({
+    semester: { code: s.code, name: s.name },
+    registration_open: await isRegistrationOpen(),
+  });
 }));
 
 // 교과군 목록 — 강좌 개설 폼(강사/관리자)에서 사용.

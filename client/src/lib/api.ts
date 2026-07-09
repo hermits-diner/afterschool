@@ -34,17 +34,17 @@ export interface Course {
   semester: string;
   status: 'open' | 'closed' | 'cancelled';
   enrolled_count: number;
-  waitlisted_count: number;
   seats_left: number;
   is_full: boolean;
   syllabus_filename?: string | null;
   schedule?: { day: string; from: number; to: number }[] | null;
   schedule_label?: string;
   group_id?: number | null;
+  group_name?: string | null;
   target_grades?: number[];
   // present on student "mine" responses
   enrollment_id?: number;
-  enrollment_status?: 'enrolled' | 'waitlisted' | 'cancelled';
+  enrollment_status?: 'enrolled' | 'cancelled';
 }
 
 export interface CourseGroup {

@@ -33,12 +33,11 @@ export default function PrintEnrollments() {
   if (!courses) return <PrintLoading />;
 
   const totalEnrolled = rows.filter((r) => r.status === 'enrolled').length;
-  const totalWaitlisted = rows.filter((r) => r.status === 'waitlisted').length;
 
   return (
     <PrintShell title="수강신청 현황" hint="수강신청 현황 미리보기 · 인쇄(Ctrl/⌘+P)" width="lg">
       <PrintMeta>
-        개설 강좌 {courses.length}개 · 수강확정 {totalEnrolled}건 · 대기 {totalWaitlisted}건
+        개설 강좌 {courses.length}개 · 수강확정 {totalEnrolled}건
       </PrintMeta>
 
       {/* 강좌별 요약 */}
@@ -53,7 +52,6 @@ export default function PrintEnrollments() {
             <Th w="9%">대상</Th>
             <Th w="8%">정원</Th>
             <Th w="8%">신청</Th>
-            <Th w="8%">대기</Th>
             <Th w="9%">상태</Th>
           </tr>
         </thead>
@@ -68,7 +66,6 @@ export default function PrintEnrollments() {
               <Td center>{targetGradesLabel(c.target_grades)}</Td>
               <Td center>{c.capacity}</Td>
               <Td center>{c.enrolled_count}</Td>
-              <Td center>{c.waitlisted_count}</Td>
               <Td center>{courseStatusLabel(c.status)}</Td>
             </tr>
           ))}

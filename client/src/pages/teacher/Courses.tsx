@@ -212,7 +212,7 @@ export default function TeacherCourses() {
               )}
               <div className="mb-1 flex justify-between text-xs text-slate-500">
                 <span>수강 인원</span>
-                <span className="font-semibold text-slate-700">{c.enrolled_count}/{c.capacity}명 {c.waitlisted_count > 0 && `(대기 ${c.waitlisted_count})`}</span>
+                <span className="font-semibold text-slate-700">{c.enrolled_count}/{c.capacity}명</span>
               </div>
               <ProgressBar value={c.enrolled_count} max={c.capacity} />
               <div className="mt-4 flex flex-wrap justify-end gap-1.5">

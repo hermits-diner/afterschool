@@ -11,7 +11,6 @@ interface Stats {
     courses: number;
     open_courses: number;
     enrollments: number;
-    waitlisted: number;
   };
   byCategory: { category: string; count: number }[];
   popularCourses: Course[];
@@ -56,11 +55,6 @@ export default function AdminDashboard() {
             ))}
             {byCategory.length === 0 && <p className="text-sm text-slate-400">데이터가 없습니다.</p>}
           </div>
-          {counts.waitlisted > 0 && (
-            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              현재 대기 인원 {counts.waitlisted}명 · 정원 초과 강좌가 있습니다.
-            </p>
-          )}
         </div>
 
         {/* Popular courses */}

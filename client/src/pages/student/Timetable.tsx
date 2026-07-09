@@ -30,7 +30,7 @@ export default function StudentTimetable() {
       </div>
 
       {enrolled.length === 0 ? (
-        <EmptyState message="수강 확정된 강좌가 없습니다." sub="대기 중인 강좌는 시간표에 표시되지 않습니다." />
+        <EmptyState message="수강 확정된 강좌가 없습니다." sub="강좌 신청 메뉴에서 방과후 강좌를 신청해 보세요." />
       ) : (
         <>
           <Timetable courses={enrolled} />

@@ -56,7 +56,7 @@ export default function Login() {
           </p>
           <ul className="mt-10 space-y-4 text-base text-brand-50">
             <li className="flex items-center gap-3"><Dot /> 선착순 신청 · 남은 자리 실시간 확인</li>
-            <li className="flex items-center gap-3"><Dot /> 정원 마감 시 대기 신청 — 자리가 나면 자동 확정</li>
+            <li className="flex items-center gap-3"><Dot /> 시간표 충돌·대상 학년 자동 검사로 안전한 신청</li>
             <li className="flex items-center gap-3"><Dot /> 내 수강신청과 교시별 시간표를 한눈에</li>
             <li className="flex items-center gap-3"><Dot /> 강좌 소개와 강의계획서 미리 보기</li>
           </ul>

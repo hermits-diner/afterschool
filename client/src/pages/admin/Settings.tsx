@@ -134,6 +134,25 @@ export default function AdminSettings() {
     }
   }
 
+  // 원클릭 접수 마감/재개 — 마감하면 학생은 신청·취소 모두 불가 (임의 수정 차단)
+  async function toggleRegistration(s: Semester) {
+    const opening = s.registration_open !== 'true';
+    const msg = opening
+      ? `'${s.name}' 수강신청 접수를 다시 열까요?`
+      : `'${s.name}' 수강신청을 마감하시겠습니까?\n\n마감하면 학생은 수강신청과 취소를 할 수 없습니다. (확정 명단 잠금)`;
+    if (!confirm(msg)) return;
+    try {
+      await api.put(`/admin/semesters/${s.code}`, { registration_open: opening });
+      toast(
+        opening ? '접수가 재개되었습니다.' : '수강신청이 마감되었습니다. 학생은 더 이상 신청·취소할 수 없습니다.',
+        'success'
+      );
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '변경에 실패했습니다.', 'error');
+    }
+  }
+
   async function activate(s: Semester) {
     if (!confirm(`'${s.name}' 세션을 활성화하시겠습니까?\n강좌 개설·수강신청이 이 세션 기준으로 동작합니다.`)) return;
     await api.post(`/admin/semesters/${s.code}/activate`);
@@ -201,6 +220,17 @@ export default function AdminSettings() {
                   </div>
                 </div>
                 <div className="flex gap-1.5">
+                  {s.is_active && (
+                    s.registration_open === 'true' ? (
+                      <button className="btn-sm rounded-lg bg-rose-600 px-3 font-medium text-white hover:bg-rose-700" onClick={() => toggleRegistration(s)}>
+                        신청 마감
+                      </button>
+                    ) : (
+                      <button className="btn-sm rounded-lg bg-emerald-600 px-3 font-medium text-white hover:bg-emerald-700" onClick={() => toggleRegistration(s)}>
+                        접수 재개
+                      </button>
+                    )
+                  )}
                   {!s.is_active && (
                     <button className="btn-secondary btn-sm" onClick={() => activate(s)}>활성화</button>
                   )}

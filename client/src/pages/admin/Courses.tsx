@@ -170,7 +170,7 @@ export default function AdminCourses() {
   }
 
   const selectedCourses = (courses || []).filter((c) => selected.has(c.id));
-  const selectedEnrollments = selectedCourses.reduce((sum, c) => sum + c.enrolled_count + c.waitlisted_count, 0);
+  const selectedEnrollments = selectedCourses.reduce((sum, c) => sum + c.enrolled_count, 0);
 
   async function bulkDelete() {
     if (delConfirm !== '삭제') return;
@@ -386,9 +386,6 @@ export default function AdminCourses() {
                           <span className="font-medium text-slate-600 group-hover:text-brand-600">
                             {c.enrolled_count}/{c.capacity}
                           </span>
-                          {c.waitlisted_count > 0 && (
-                            <span className="text-amber-600">+{c.waitlisted_count}</span>
-                          )}
                         </div>
                         <ProgressBar value={c.enrolled_count} max={c.capacity} />
                       </button>
@@ -423,7 +420,7 @@ export default function AdminCourses() {
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             ⚠️ 선택한 <b>{selected.size}개 강좌</b>를 삭제합니다.
             {selectedEnrollments > 0 && (
-              <> 이 강좌들에는 <b>수강신청·대기 {selectedEnrollments}건</b>이 연결되어 있습니다.</>
+              <> 이 강좌들에는 <b>수강신청 {selectedEnrollments}건</b>이 연결되어 있습니다.</>
             )}
             <br />
             삭제된 강좌는 <b>휴지통으로 이동</b>하며, 잘못 삭제한 경우 신청 내역까지 그대로 복원할 수 있습니다.
@@ -432,7 +429,7 @@ export default function AdminCourses() {
           <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600">
             {selectedCourses.map((c) => (
               <div key={c.id} className="py-0.5">
-                {c.title} <span className="text-slate-400">— {c.teacher_name} · 신청 {c.enrolled_count + c.waitlisted_count}건</span>
+                {c.title} <span className="text-slate-400">— {c.teacher_name} · 신청 {c.enrolled_count}건</span>
               </div>
             ))}
           </div>

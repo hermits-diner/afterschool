@@ -4,9 +4,12 @@ import { api, Course, ApiError } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { formatFee } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
+import { useRegistrationOpen } from '../../lib/useSemester';
 
 export default function StudentMyCourses() {
   const toast = useToast();
+  const regOpen = useRegistrationOpen();
+  const locked = regOpen === false; // 접수 마감 — 취소 잠금
   const [mine, setMine] = useState<Course[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -40,6 +43,12 @@ export default function StudentMyCourses() {
       <h1 className="mb-1 text-2xl font-bold text-slate-900">내 수강신청</h1>
       <p className="mb-6 text-sm text-slate-500">신청한 강좌를 확인하고 취소할 수 있습니다.</p>
 
+      {locked && (
+        <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          🔒 수강신청이 마감되어 취소할 수 없습니다. 변경이 필요하면 방과후 담당 선생님께 문의하세요.
+        </div>
+      )}
+
       {mine.length === 0 ? (
         <EmptyState message="신청한 강좌가 없습니다." sub="강좌 신청 메뉴에서 방과후 강좌를 신청해 보세요." />
       ) : (
@@ -71,7 +80,9 @@ export default function StudentMyCourses() {
                       <td className="td">{formatFee(c.fee)}</td>
                       <td className="td"><EnrollBadge status={c.enrollment_status} /></td>
                       <td className="td text-right">
-                        <button className="btn-ghost btn-sm text-rose-600" onClick={() => cancel(c)} disabled={busy === c.id}>취소</button>
+                        <button className="btn-ghost btn-sm text-rose-600" onClick={() => cancel(c)} disabled={busy === c.id || locked}>
+                          {locked ? '마감' : '취소'}
+                        </button>
                       </td>
                     </tr>
                   ))}

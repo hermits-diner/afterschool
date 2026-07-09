@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
-import { publicUser, decorateCourses, promoteWaitlist, getCourseRoster, getActiveSemester, trashCourses, restoreTrashedCourse, purgeTrashedCourses, PERIOD_TIMES } from '../logic.js';
+import { publicUser, decorateCourses, getCourseRoster, getActiveSemester, trashCourses, restoreTrashedCourse, purgeTrashedCourses, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -12,16 +12,18 @@ router.get('/stats', ah(async (req, res) => {
   const semester = (await getSettings()).semester;
   const count = async (sql, args) => (await get(sql, args)).c;
   const counts = {
-    students: await count("SELECT COUNT(*) c FROM users WHERE role='student' AND active=1"),
+    // 수강신청한 학생 수 — 활성 세션에서 취소되지 않은 신청을 가진 서로 다른 학생
+    students: await count(
+      `SELECT COUNT(DISTINCT e.student_id) c FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+       WHERE e.status != 'cancelled' AND c.semester = ?`,
+      [semester]
+    ),
     teachers: await count("SELECT COUNT(*) c FROM users WHERE role='teacher' AND active=1"),
     courses: await count('SELECT COUNT(*) c FROM courses WHERE semester=?', [semester]),
     open_courses: await count("SELECT COUNT(*) c FROM courses WHERE semester=? AND status='open'", [semester]),
     enrollments: await count(
       "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='enrolled' AND c.semester=?",
-      [semester]
-    ),
-    waitlisted: await count(
-      "SELECT COUNT(*) c FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.status='waitlisted' AND c.semester=?",
       [semester]
     ),
   };
@@ -112,7 +114,6 @@ router.get('/cancelled-enrollments', ah(async (req, res) => {
       category: r.category,
       teacher_name: r.teacher_name || '미배정',
       group_name: r.group_name || null,
-      was_waitlisted: r.status === 'waitlisted',
     });
   }
   res.json({ semester, students: [...byStudent.values()] });
@@ -777,7 +778,7 @@ router.delete('/courses/trash', ah(async (req, res) => {
 }));
 
 /* ---------------- Enrollment management ---------------- */
-// Roster for any course (신청순 — 대기 순번 확인용)
+// Roster for any course (신청순)
 router.get('/courses/:id/roster', ah(async (req, res) => {
   res.json({ roster: await getCourseRoster(req.params.id, 'created') });
 }));
@@ -786,9 +787,7 @@ router.get('/courses/:id/roster', ah(async (req, res) => {
 router.delete('/enrollments/:id', ah(async (req, res) => {
   const enrollment = await get('SELECT * FROM enrollments WHERE id = ?', [req.params.id]);
   if (!enrollment) return res.status(404).json({ error: '신청 내역을 찾을 수 없습니다.' });
-  const wasEnrolled = enrollment.status === 'enrolled';
   await run("UPDATE enrollments SET status='cancelled' WHERE id = ?", [enrollment.id]);
-  if (wasEnrolled) await promoteWaitlist(enrollment.course_id);
   res.json({ ok: true });
 }));
 

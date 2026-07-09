@@ -36,9 +36,9 @@ export function CategoryBadge({ category }: { category: string }) {
   return <span className={`badge ${categoryColor(category)}`}>{category}</span>;
 }
 
-// Enrollment status pill: 수강확정(green) / 대기(amber)
+// Enrollment status pill: 수강확정(green)
 export function EnrollBadge({ status }: { status?: string }) {
-  const cls = status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+  const cls = status === 'enrolled' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600';
   return <span className={`badge ${cls}`}>{enrollStatusLabel(status)}</span>;
 }
 

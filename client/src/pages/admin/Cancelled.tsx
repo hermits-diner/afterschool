@@ -15,7 +15,6 @@ export interface CancelledStudent {
     category: string;
     teacher_name: string;
     group_name: string | null;
-    was_waitlisted: boolean;
   }[];
 }
 
@@ -106,7 +105,6 @@ export default function AdminCancelled() {
                           {s.courses.map((c, i) => (
                             <span key={i} className="badge bg-rose-100 text-rose-700">
                               {cancelledCourseLabel(c)}
-                              {c.was_waitlisted && ' (대기였음)'}
                             </span>
                           ))}
                         </div>

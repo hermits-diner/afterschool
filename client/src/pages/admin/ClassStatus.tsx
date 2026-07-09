@@ -11,7 +11,7 @@ export interface ClassStudent {
   student_no: number;
   enrollments: {
     title: string;
-    status: 'enrolled' | 'waitlisted';
+    status: 'enrolled';
     teacher_name?: string;
     group_name?: string | null;
   }[];
