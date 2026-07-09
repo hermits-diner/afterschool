@@ -310,7 +310,7 @@ router.patch('/courses/:id/sessions', ah(async (req, res) => {
 
 /* ---------------- Semester (세션) management ---------------- */
 const semesterSchema = z.object({
-  code: z.string().regex(/^\d{4}-[12]$/, "세션 코드는 '2026-1' 형식이어야 합니다."),
+  code: z.string().regex(/^\d{4}-([12]|여름|겨울|특강\d?)$/, "세션 코드는 '2026-1'(학기), '2026-여름'(방학), '2026-특강'(특강, 번호 가능) 형식이어야 합니다."),
   name: z.string().optional(),
   registration_open: z.union([z.boolean(), z.string()]).optional(),
   registration_start: z.string().optional().nullable(),

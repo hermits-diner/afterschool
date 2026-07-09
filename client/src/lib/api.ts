@@ -28,6 +28,7 @@ export interface Course {
   start_time: string;
   end_time: string;
   room: string;
+  textbook?: string | null; // 부교재명 (빈값 = 자체제작)
   target_grade: number;
   fee: number;
   pay_rate: number;

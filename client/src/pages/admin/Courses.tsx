@@ -3,7 +3,7 @@ import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseF
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
-import { CATEGORIES, targetGradesLabel, studentLabel, Slot, scheduleLabel } from '../../lib/format';
+import { CATEGORIES, targetGradesLabel, studentLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
 import GradePicker from '../../components/GradePicker';
 import { useToast } from '../../context/ToastContext';
 
@@ -13,6 +13,7 @@ type Form = {
   title: string;
   category: string;
   description: string;
+  textbook: string;
   teacher_id: number | null;
   capacity: number;
   group_id: number | null; // null = 직접 지정
@@ -50,6 +51,7 @@ const emptyForm: Form = {
   title: '',
   category: '국어',
   description: '',
+  textbook: '자체제작',
   teacher_id: null,
   capacity: 20,
   group_id: null,
@@ -242,6 +244,7 @@ export default function AdminCourses() {
       title: c.title,
       category: c.category,
       description: c.description || '',
+      textbook: c.textbook || '자체제작',
       teacher_id: c.teacher_id,
       capacity: c.capacity,
       group_id: c.group_id ?? null,
@@ -672,7 +675,21 @@ export default function AdminCourses() {
           </div>
           <div>
             <label className="label">강좌 소개</label>
-            <textarea className="input min-h-[80px]" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <textarea
+              className="input min-h-[80px]"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              placeholder={DESCRIPTION_HINT}
+            />
+          </div>
+          <div>
+            <label className="label">부교재명 — 별도 교재가 없으면 '자체제작'</label>
+            <input
+              className="input"
+              value={form.textbook}
+              onChange={(e) => setForm({ ...form, textbook: e.target.value })}
+              placeholder="예: EBS 수능특강 독서 (없으면 자체제작)"
+            />
           </div>
           <div>
             <label className="label">강의계획서 첨부 (PDF·HWP·DOCX 등, 최대 5MB)</label>

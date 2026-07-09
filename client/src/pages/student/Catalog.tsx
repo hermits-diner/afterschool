@@ -197,6 +197,7 @@ export default function StudentCatalog() {
               <Row label="교시" value={detail.schedule_label || ''} />
               <Row label="강의실" value={detail.room || '미정'} />
               <Row label="수강료" value={formatFee(detail.fee)} />
+              <Row label="부교재" value={detail.textbook || '자체제작'} />
               <Row label="정원" value={`${detail.enrolled_count} / ${detail.capacity}명`} />
               <Row label="잔여 좌석" value={detail.is_full ? '정원 마감' : `${detail.seats_left}자리`} />
             </dl>

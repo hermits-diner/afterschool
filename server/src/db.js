@@ -75,6 +75,7 @@ const SCHEMA = [
     start_time    TEXT NOT NULL,
     end_time      TEXT NOT NULL,
     room          TEXT,
+    textbook      TEXT,                        -- 부교재명 (빈값 = 자체제작)
     target_grade  INTEGER,                     -- (레거시) 단일 학년
     target_grades TEXT,                        -- '1,2' 복수 학년, 빈값/NULL = 전학년
     fee           INTEGER NOT NULL DEFAULT 0,
@@ -205,6 +206,7 @@ export async function initSchema() {
     .catch(() => {});
   await client.execute('ALTER TABLE courses ADD COLUMN schedule TEXT').catch(() => {});
   await client.execute('ALTER TABLE courses ADD COLUMN group_id INTEGER').catch(() => {});
+  await client.execute('ALTER TABLE courses ADD COLUMN textbook TEXT').catch(() => {});
   // 복수 학년 대상: '1,2' 형식, 빈 문자열/NULL = 전학년. 기존 단일 값 이관.
   await client.execute('ALTER TABLE courses ADD COLUMN target_grades TEXT').catch(() => {});
   await client
@@ -259,10 +261,12 @@ export async function initSchema() {
   }
 }
 
-// '2026-1' → '2026학년도 1학기'
+// '2026-1' → '2026학년도 1학기', '2026-여름' → '2026학년도 여름방학', '2026-특강2' → '2026학년도 특강2'
 export function semesterName(code) {
-  const m = String(code).match(/^(\d{4})-(\d)$/);
-  return m ? `${m[1]}학년도 ${m[2]}학기` : String(code);
+  const m = String(code).match(/^(\d{4})-(\d|여름|겨울|특강\d?)$/);
+  if (!m) return String(code);
+  const part = /^\d$/.test(m[2]) ? `${m[2]}학기` : m[2].startsWith('특강') ? m[2] : `${m[2]}방학`;
+  return `${m[1]}학년도 ${part}`;
 }
 
 /* ---- Settings ---- */

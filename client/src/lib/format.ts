@@ -65,6 +65,10 @@ export function formatFee(fee: number) {
   return fee === 0 ? '무료' : `${fee.toLocaleString()}원`;
 }
 
+// 강좌 소개 필수 내용 안내 예시문 (강좌 개설 폼 placeholder — 관리자·강사 공용)
+export const DESCRIPTION_HINT =
+  '무엇을 배우는지·수업 방식·준비물을 간략히 적어 주세요.\n예) 수능 비문학 지문을 유형별로 분석하고 매주 실전 문제를 풀이합니다. 준비물: 필기구';
+
 export function roleLabel(role: string) {
   return { admin: '관리자', teacher: '강사', student: '학생' }[role] || role;
 }

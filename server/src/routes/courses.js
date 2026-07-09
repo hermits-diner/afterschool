@@ -68,6 +68,7 @@ const courseSchema = z.object({
   schedule: z.array(slotSchema).max(20).optional(), // 다중 슬롯 직접 지정 (관리자)
   group_id: z.number().int().nullable().optional(), // 교과군 선택
   room: z.string().optional().default(''),
+  textbook: z.string().max(100).optional().default(''), // 부교재명 (빈값 = 자체제작)
   target_grade: z.number().int().min(0).max(3).optional(), // 레거시
   target_grades: z.array(z.number().int().min(1).max(3)).max(3).optional(), // [] 또는 3개 전부 = 전학년
   fee: z.number().int().min(0).default(0),
@@ -130,6 +131,7 @@ function courseValues(d) {
     d.start_time,
     d.end_time,
     d.room ?? '',
+    d.textbook ?? '',
     d.target_grade ?? 0,
     d.target_grades ?? '',
     d.fee,
@@ -167,8 +169,8 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
 
   const info = await run(
     `INSERT INTO courses
-     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, textbook, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       ...courseValues({
         ...d,
@@ -225,7 +227,7 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   }
   await run(
     `UPDATE courses SET title=?, category=?, description=?, teacher_id=?, capacity=?,
-     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, target_grades=?, fee=?, pay_rate=?, planned_sessions=?, schedule=?, group_id=?, status=?
+     day_of_week=?, start_time=?, end_time=?, room=?, textbook=?, target_grade=?, target_grades=?, fee=?, pay_rate=?, planned_sessions=?, schedule=?, group_id=?, status=?
      WHERE id=?`,
     [...courseValues(merged), existing.id]
   );

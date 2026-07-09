@@ -29,6 +29,14 @@ const emptyForm = {
   registration_open: true,
 };
 
+// 세션 코드 → 이름 미리보기: '2026-1' → '2026학년도 1학기', '2026-여름' → '2026학년도 여름방학', '2026-특강2' → '2026학년도 특강2'
+function sessionNamePreview(code: string) {
+  const m = String(code).match(/^(\d{4})-(\d|여름|겨울|특강\d?)$/);
+  if (!m) return '';
+  const part = /^\d$/.test(m[2]) ? `${m[2]}학기` : m[2].startsWith('특강') ? m[2] : `${m[2]}방학`;
+  return `${m[1]}학년도 ${part}`;
+}
+
 export default function AdminSettings() {
   const toast = useToast();
   const [semesters, setSemesters] = useState<Semester[] | null>(null);
@@ -267,32 +275,6 @@ export default function AdminSettings() {
         해당 학기의 강좌·수강신청·출석·공지 데이터가 한 번에 정리됩니다. (활성 세션은 삭제할 수 없습니다)
       </div>
 
-      {/* ---------- 로그인 화면 공지 — 수강신청 기간 안내 등 ---------- */}
-      <div className="mt-10 border-t border-slate-200 pt-8">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-slate-900">로그인 화면 공지</h2>
-          <p className="text-sm text-slate-500">
-            로그인(랜딩) 화면에 표시되는 공지입니다. 활성 세션의 <b>수강신청 기간과 접수 상태는 자동으로 표시</b>되며,
-            여기에는 추가 안내(추가신청 일정, 유의사항 등)를 적습니다. 비워두면 기간 안내만 표시됩니다.
-          </p>
-        </div>
-        <div className="card space-y-3 p-5">
-          <textarea
-            className="input min-h-[100px]"
-            value={notice}
-            onChange={(e) => setNotice(e.target.value)}
-            maxLength={2000}
-            placeholder={'예: 추가 수강신청은 7월 20일(월) 09:00 ~ 7월 22일(수) 17:00입니다.\n문의: 교무실 방과후학교 담당 (☎ 000-0000)'}
-          />
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">{notice.length}/2000자 · 저장 즉시 로그인 화면에 반영됩니다.</span>
-            <button className="btn-primary" onClick={saveNotice} disabled={noticeSaving}>
-              {noticeSaving ? '저장 중...' : '공지 저장'}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* ---------- 교과군 관리 — 시간표 양식으로 교시 블록 설정 ---------- */}
       <div className="mt-10 border-t border-slate-200 pt-8">
         <div className="mb-4">
@@ -372,16 +354,42 @@ export default function AdminSettings() {
         </div>
       </div>
 
+      {/* ---------- 로그인 화면 공지 — 수강신청 기간 안내 등 ---------- */}
+      <div className="mt-10 border-t border-slate-200 pt-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-slate-900">로그인 화면 공지</h2>
+          <p className="text-sm text-slate-500">
+            로그인(랜딩) 화면에 표시되는 공지입니다. 활성 세션의 <b>수강신청 기간과 접수 상태는 자동으로 표시</b>되며,
+            여기에는 추가 안내(추가신청 일정, 유의사항 등)를 적습니다. 비워두면 기간 안내만 표시됩니다.
+          </p>
+        </div>
+        <div className="card space-y-3 p-5">
+          <textarea
+            className="input min-h-[100px]"
+            value={notice}
+            onChange={(e) => setNotice(e.target.value)}
+            maxLength={2000}
+            placeholder={'예: 추가 수강신청은 7월 20일(월) 09:00 ~ 7월 22일(수) 17:00입니다.\n문의: 교무실 방과후학교 담당 (☎ 000-0000)'}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">{notice.length}/2000자 · 저장 즉시 로그인 화면에 반영됩니다.</span>
+            <button className="btn-primary" onClick={saveNotice} disabled={noticeSaving}>
+              {noticeSaving ? '저장 중...' : '공지 저장'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `세션 설정 · ${editing.name}` : '새 세션 만들기'}>
         <form onSubmit={save} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="label">세션 코드 *</label>
+              <label className="label">세션 코드 * — 연도-학기 또는 연도-방학</label>
               <input
                 className="input"
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
-                placeholder="예: 2026-2"
+                placeholder="예: 2026-2 · 2026-여름 · 2026-특강"
                 disabled={!!editing}
                 required
               />
@@ -392,7 +400,7 @@ export default function AdminSettings() {
                 className="input"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder={form.code ? `${form.code.split('-')[0]}학년도 ${form.code.split('-')[1] || ''}학기` : '비우면 자동 생성'}
+                placeholder={sessionNamePreview(form.code) || '비우면 자동 생성'}
               />
             </div>
           </div>
