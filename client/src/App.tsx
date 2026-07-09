@@ -58,8 +58,8 @@ const adminNav: NavItem[] = [
   { to: '/admin/enrollments', label: '수강신청 현황', icon: <Icons.clipboard />, section: '운영' },
   { to: '/admin/classes', label: '반별 현황', icon: <Icons.users /> },
   { to: '/admin/cancelled', label: '폐강 재신청', icon: <Icons.clipboard /> },
-  // 마감: 정산
-  { to: '/admin/finance', label: '정산 관리', icon: <Icons.wallet />, section: '마감' },
+  // 마감: 방과후행정 (강사료·총수강료 계산)
+  { to: '/admin/finance', label: '방과후행정', icon: <Icons.wallet />, section: '마감' },
 ];
 const teacherNav: NavItem[] = [
   { to: '/teacher', label: '대시보드', icon: <Icons.dashboard /> },

@@ -140,9 +140,9 @@ export default function AdminFinance() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">정산 관리</h1>
+          <h1 className="text-2xl font-bold text-slate-900">방과후행정</h1>
           <p className="text-sm text-slate-500">
-            수강료 수입과 강사료(회당 단가 × 회차)를 집계합니다. 회차는 기본적으로 계획 차시 전부 실시 기준입니다.
+            총수강료 계산과 강사료(회당 단가 × 회차)를 집계합니다. 회차는 기본적으로 계획 차시 전부 실시 기준입니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -156,14 +156,7 @@ export default function AdminFinance() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Stat label="총 수강료 수입" value={won(totals.revenue)} accent="bg-brand-50 text-brand-600" icon={<Icons.wallet size={22} />} />
         <Stat label="총 강사료" value={won(totals.teacher_pay)} accent="bg-emerald-50 text-emerald-600" icon={<Icons.users size={22} />} />
-        <Stat
-          label="수지 (수입 − 강사료)"
-          value={<span className={totals.net < 0 ? 'text-rose-600' : ''}>{won(totals.net)}</span>}
-          accent="bg-amber-50 text-amber-600"
-          icon={<Icons.chart size={22} />}
-        />
       </div>
 
       {/* ---------- 총수강료 · 1과목 수강료 계산 (학년군별) ---------- */}
@@ -312,8 +305,6 @@ export default function AdminFinance() {
                 <th className="th">강좌</th>
                 <th className="th">강사</th>
                 <th className="th text-center">인원</th>
-                <th className="th text-right">수강료 단가</th>
-                <th className="th text-right">수강료 수입</th>
                 <th className="th text-right">회당 강사료</th>
                 <th className="th text-center">실시 회차</th>
                 <th className="th text-right">강사료</th>
@@ -330,8 +321,6 @@ export default function AdminFinance() {
                   </td>
                   <td className="td">{r.teacher_name}</td>
                   <td className="td text-center">{r.enrolled_count}</td>
-                  <td className="td text-right">{won(r.fee)}</td>
-                  <td className="td text-right">{won(r.revenue)}</td>
                   <td className="td text-right">
                     {r.pay_rate === 0 ? <span className="badge bg-amber-100 text-amber-700">미책정</span> : won(r.pay_rate)}
                   </td>
@@ -373,7 +362,7 @@ export default function AdminFinance() {
                 </tr>
               ))}
               {courses.length === 0 && (
-                <tr><td colSpan={8} className="td py-8 text-center text-slate-400">정산할 강좌가 없습니다.</td></tr>
+                <tr><td colSpan={6} className="td py-8 text-center text-slate-400">정산할 강좌가 없습니다.</td></tr>
               )}
             </tbody>
           </table>
