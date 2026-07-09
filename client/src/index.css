@@ -89,4 +89,9 @@ table {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* 페이지 나누기 — 반별 인쇄 등에서 섹션마다 새 페이지 시작 (구형 문법 병기) */
+  .page-break {
+    break-after: page;
+    page-break-after: always;
+  }
 }

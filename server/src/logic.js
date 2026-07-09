@@ -66,12 +66,13 @@ export function parseTargetGrades(course) {
   return course.target_grade > 0 ? [course.target_grade] : [];
 }
 
+// 축약 표기: '월7', '월7~9' — 여러 슬롯은 쉼표로 (예: '월7, 화7, 수7')
 export function scheduleLabel(course) {
   const slots = parseSlots(course);
   if (!slots) return `${course.day_of_week} ${course.start_time}~${course.end_time}`;
   return slots
-    .map((s) => `${s.day} ${s.from === s.to ? `${s.from}교시` : `${s.from}~${s.to}교시`}`)
-    .join(' · ');
+    .map((s) => (s.from === s.to ? `${s.day}${s.from}` : `${s.day}${s.from}~${s.to}`))
+    .join(', ');
 }
 
 // Count active (enrolled) students for a course.

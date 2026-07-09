@@ -20,7 +20,7 @@ export function slotLabel(s: Slot) {
 }
 
 export function scheduleLabel(slots?: Slot[] | null) {
-  return slots && slots.length ? slots.map(slotLabel).join(' · ') : '';
+  return slots && slots.length ? slots.map(slotLabel).join(', ') : '';
 }
 export const SEMESTER_LABEL = '2026학년도 1학기 방과후학교';
 

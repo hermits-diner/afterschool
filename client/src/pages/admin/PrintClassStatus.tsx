@@ -33,7 +33,7 @@ export default function PrintClassStatus() {
         <p className="py-10 text-center text-slate-400">해당 학급이 없습니다.</p>
       ) : (
         targets.map((c, idx) => (
-          <div key={`${c.grade}-${c.class_no}`} style={idx < targets.length - 1 ? { breakAfter: 'page' } : undefined}>
+          <div key={`${c.grade}-${c.class_no}`} className={idx < targets.length - 1 ? 'page-break' : undefined}>
             <h2 className="mb-1 mt-2 text-lg font-bold text-slate-900">
               {c.grade}학년 {c.class_no}반
             </h2>
