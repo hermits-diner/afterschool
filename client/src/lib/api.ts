@@ -38,6 +38,7 @@ export interface Course {
   enrolled_count: number;
   seats_left: number;
   is_full: boolean;
+  wish_count?: number; // 빈자리 희망 인원 (관리자·강사 참고용)
   syllabus_filename?: string | null;
   schedule?: { day: string; from: number; to: number }[] | null;
   schedule_label?: string;

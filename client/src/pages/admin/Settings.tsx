@@ -369,7 +369,7 @@ export default function AdminSettings() {
             value={notice}
             onChange={(e) => setNotice(e.target.value)}
             maxLength={2000}
-            placeholder={'예: 추가 수강신청은 7월 20일(월) 09:00 ~ 7월 22일(수) 17:00입니다.\n문의: 교무실 방과후학교 담당 (☎ 000-0000)'}
+            placeholder={'예: 신청 시작 전에 미리 로그인해 두면 시작 시각에 바로 신청할 수 있습니다.\n추가 수강신청은 7월 20일(월) 09:00 ~ 7월 22일(수) 17:00입니다.\n문의: 교무실 방과후학교 담당 (☎ 000-0000)'}
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">{notice.length}/2000자 · 저장 즉시 로그인 화면에 반영됩니다.</span>

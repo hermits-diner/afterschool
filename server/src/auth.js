@@ -1,5 +1,15 @@
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
+import bcryptjs from 'bcryptjs';
+
+// 네이티브 bcrypt(C++, 워커 스레드 병렬)를 우선 사용하고,
+// 바이너리 설치가 안 되는 환경에서는 순수 JS bcryptjs로 자동 폴백한다.
+// 두 라이브러리의 해시는 완전 호환이라 기존 비밀번호는 그대로 검증된다.
+let bcrypt = bcryptjs;
+try {
+  bcrypt = (await import('bcrypt')).default;
+} catch {
+  console.warn('⚠️  native bcrypt 미설치 — bcryptjs(순수 JS)로 동작합니다. 동시 로그인이 많으면 느려질 수 있습니다.');
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'afterschool-dev-secret-change-in-prod';
 const TOKEN_TTL = '7d';
@@ -16,8 +26,10 @@ export function hashPassword(plain) {
   return bcrypt.hashSync(plain, 10);
 }
 
+// 비동기 검증 — 네이티브 bcrypt에서는 워커 스레드 풀에서 병렬 처리되어
+// 동시 로그인 폭주 시 이벤트 루프가 막히지 않는다. (양쪽 라이브러리 모두 Promise 지원)
 export function verifyPassword(plain, hash) {
-  return bcrypt.compareSync(plain, hash);
+  return bcrypt.compare(plain, hash);
 }
 
 export function signToken(user) {

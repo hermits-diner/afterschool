@@ -202,6 +202,7 @@ export async function trashCourses(ids, deletedBy = null) {
     { sql: `DELETE FROM attendance WHERE course_id IN (${fph})`, args: found },
     { sql: `DELETE FROM announcements WHERE course_id IN (${fph})`, args: found },
     { sql: `DELETE FROM enrollments WHERE course_id IN (${fph})`, args: found },
+    { sql: `DELETE FROM course_wishes WHERE course_id IN (${fph})`, args: found },
     { sql: `DELETE FROM course_files WHERE course_id IN (${fph})`, args: found },
     { sql: `DELETE FROM courses WHERE id IN (${fph})`, args: found },
   ]);
@@ -289,6 +290,13 @@ export async function decorateCourses(courses) {
   );
   const fileMap = Object.fromEntries(files.map((f) => [f.course_id, f.filename]));
 
+  // 빈자리 희망 인원 — 관리자·강사가 증설/정원 조정 판단에 사용
+  const wishes = await all(
+    `SELECT course_id, COUNT(*) AS c FROM course_wishes WHERE course_id IN (${ph}) GROUP BY course_id`,
+    ids
+  );
+  const wishMap = Object.fromEntries(wishes.map((w) => [w.course_id, w.c]));
+
   // 교과군 이름 (강좌 목록을 교과군별로 묶어 보여줄 때 사용)
   const groupIds = [...new Set(courses.map((c) => c.group_id).filter(Boolean))];
   const groups = groupIds.length
@@ -311,6 +319,7 @@ export async function decorateCourses(courses) {
       enrolled_count: enrolled,
       seats_left: Math.max(0, course.capacity - enrolled),
       is_full: enrolled >= course.capacity,
+      wish_count: wishMap[course.id] || 0,
       syllabus_filename: fileMap[course.id] || null,
     };
   });

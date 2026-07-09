@@ -157,6 +157,13 @@ const SCHEMA = [
     default_sessions INTEGER NOT NULL DEFAULT 16,   -- 기본 계획 차시 (강사 개설 시 자동 적용)
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  `CREATE TABLE IF NOT EXISTS course_wishes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,           -- 빈자리 희망 (자동 배정 없음)
+    course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (course_id, student_id)
+  )`,
   'CREATE INDEX IF NOT EXISTS idx_courses_semester ON courses(semester)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_student ON enrollments(student_id)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_course ON enrollments(course_id)',

@@ -53,7 +53,7 @@ router.post('/login', ah(async (req, res) => {
   }
 
   const user = await get('SELECT * FROM users WHERE username = ?', [username]);
-  if (!user || !verifyPassword(password, user.password_hash)) {
+  if (!user || !(await verifyPassword(password, user.password_hash))) {
     const { fails, locked } = await recordLoginFail(username, attempts);
     if (locked) {
       return res.status(429).json({ error: `로그인 ${LOCK_THRESHOLD}회 실패로 ${LOCK_MINUTES}분간 잠금되었습니다.` });
@@ -93,7 +93,7 @@ router.post('/change-password', authRequired, ah(async (req, res) => {
   const parsed = pwSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '새 비밀번호는 4자 이상이어야 합니다.' });
   const user = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
-  if (!verifyPassword(parsed.data.current, user.password_hash)) {
+  if (!(await verifyPassword(parsed.data.current, user.password_hash))) {
     return res.status(400).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
   }
   await run('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', [

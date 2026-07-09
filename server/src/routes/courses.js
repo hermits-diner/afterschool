@@ -23,9 +23,20 @@ router.get('/', authRequired, ah(async (req, res) => {
     clauses.push('day_of_week = ?');
     params.push(day);
   }
-  if (grade) {
+  // 강사에게는 본인 담당 강좌만 노출 — 다른 강사의 신청 현황과 비교되지 않도록.
+  if (req.user.role === 'teacher') {
+    clauses.push('teacher_id = ?');
+    params.push(req.user.id);
+  }
+  // 학생에게는 본인 학년이 수강 대상인 강좌만 노출 (전학년 강좌 포함) — 서버에서 강제.
+  let gradeFilter = grade;
+  if (req.user.role === 'student') {
+    const me = await get('SELECT grade FROM users WHERE id = ?', [req.user.id]);
+    if (me?.grade) gradeFilter = me.grade;
+  }
+  if (gradeFilter) {
     clauses.push("(target_grades IS NULL OR target_grades = '' OR ',' || target_grades || ',' LIKE '%,' || ? || ',%')");
-    params.push(String(Number(grade)));
+    params.push(String(Number(gradeFilter)));
   }
   if (q) {
     clauses.push('(title LIKE ? OR description LIKE ?)');
@@ -41,6 +52,10 @@ router.get('/', authRequired, ah(async (req, res) => {
 router.get('/:id', authRequired, ah(async (req, res) => {
   const course = await get('SELECT * FROM courses WHERE id = ?', [req.params.id]);
   if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  // 강사는 본인 담당 강좌 상세만 조회 가능 (타 강좌 신청 현황 열람 차단)
+  if (req.user.role === 'teacher' && course.teacher_id !== req.user.id) {
+    return res.status(403).json({ error: '담당 강좌만 조회할 수 있습니다.' });
+  }
   const announcements = await all(
     'SELECT * FROM announcements WHERE course_id = ? ORDER BY created_at DESC',
     [course.id]

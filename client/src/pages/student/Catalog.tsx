@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
 import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../components/ui';
 import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel } from '../../lib/format';
@@ -9,11 +10,13 @@ import { Icons } from '../../components/icons';
 
 export default function StudentCatalog() {
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const regOpen = useRegistrationOpen();
   const locked = regOpen === false; // 접수 마감 — 신청·취소 잠금
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [mineIds, setMineIds] = useState<Set<number>>(new Set());
+  const [wishIds, setWishIds] = useState<Set<number>>(new Set());
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   const [day, setDay] = useState('');
@@ -24,12 +27,38 @@ export default function StudentCatalog() {
   async function load() {
     // 내 학년이 신청할 수 있는 강좌만 조회 (전학년 강좌 포함)
     const gradeParam = user?.grade ? `?grade=${user.grade}` : '';
-    const [c, mine] = await Promise.all([
+    const [c, mine, wishes] = await Promise.all([
       api.get<{ courses: Course[] }>(`/courses${gradeParam}`),
       api.get<{ courses: Course[] }>('/enrollments/mine'),
+      api.get<{ course_ids: number[] }>('/enrollments/wishes/mine'),
     ]);
     setCourses(c.courses);
     setMineIds(new Set(mine.courses.map((x) => x.id)));
+    setWishIds(new Set(wishes.course_ids));
+  }
+
+  /* ---------- 빈자리 희망 — 정원 마감 강좌에 희망을 남기고, 여석이 생기면 표시 ---------- */
+  async function wish(c: Course) {
+    setBusy(c.id);
+    try {
+      const r = await api.post<{ message: string }>('/enrollments/wishes', { course_id: c.id });
+      toast(r.message, 'success');
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '희망 등록에 실패했습니다.', 'error');
+    } finally {
+      setBusy(null);
+    }
+  }
+  async function unwish(c: Course) {
+    setBusy(c.id);
+    try {
+      await api.del(`/enrollments/wishes/${c.id}`);
+      toast('빈자리 희망을 취소했습니다.', 'success');
+      load();
+    } finally {
+      setBusy(null);
+    }
   }
   useEffect(() => {
     load();
@@ -110,6 +139,28 @@ export default function StudentCatalog() {
         </div>
       )}
 
+      {/* 희망 강좌 빈자리 알림 — 최우선 표시 */}
+      {!locked && courses.some((c) => wishIds.has(c.id) && !c.is_full && c.status === 'open') && (
+        <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          🔔 <b>빈자리 희망을 등록한 강좌에 자리가 생겼습니다!</b> 아래에서 노란 테두리 강좌를 바로 신청하세요. (선착순)
+        </div>
+      )}
+
+      {/* 신청 완료 후 로그아웃 유도 — 공용 PC에서 다음 학생을 위해 */}
+      {!locked && mineIds.size > 0 && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <span>
+            ✅ 현재 <b>{mineIds.size}과목</b> 신청 완료 — 신청을 모두 마쳤다면 <b>로그아웃</b>해 주세요. (공용 컴퓨터 보안)
+          </span>
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-white transition hover:bg-emerald-700"
+          >
+            로그아웃
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="mb-5 flex flex-wrap gap-2">
         <input className="input w-full sm:w-56" placeholder="강좌명 검색" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -138,8 +189,10 @@ export default function StudentCatalog() {
                 {groupCourses.map((c) => {
             const isMine = mineIds.has(c.id);
             const closed = c.status !== 'open';
+            const wished = wishIds.has(c.id);
+            const seatOpened = wished && !c.is_full && !closed; // 희망 강좌에 빈자리 발생
             return (
-              <div key={c.id} className="card flex flex-col p-5">
+              <div key={c.id} className={`card flex flex-col p-5 ${seatOpened ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="mb-2 flex items-center justify-between">
                   <CategoryBadge category={c.category} />
                   <span className="text-xs text-slate-400">{targetGradesLabel(c.target_grades)}</span>
@@ -154,7 +207,9 @@ export default function StudentCatalog() {
                 <div className="mb-3">
                   <div className="mb-1 flex justify-between text-xs">
                     <span className="text-slate-500">정원 {c.enrolled_count}/{c.capacity}</span>
-                    {c.is_full ? (
+                    {seatOpened ? (
+                      <span className="font-bold text-amber-600">🔔 빈자리 생김! 지금 신청하세요</span>
+                    ) : c.is_full ? (
                       <span className="font-medium text-rose-600">정원 마감</span>
                     ) : (
                       <span className="font-medium text-emerald-600">{c.seats_left}자리 남음</span>
@@ -168,9 +223,28 @@ export default function StudentCatalog() {
                     <button className="btn-danger btn-sm flex-1" onClick={() => cancel(c)} disabled={busy === c.id || locked}>
                       {locked ? '마감' : '취소'}
                     </button>
+                  ) : c.is_full && !closed && !locked ? (
+                    // 정원 마감 → 빈자리 희망 등록/취소 (자동 배정 없음, 여석 발생 시 이 화면에 표시)
+                    wished ? (
+                      <button
+                        className="btn-sm flex-1 rounded-lg border border-amber-300 bg-amber-50 font-medium text-amber-700 hover:bg-amber-100"
+                        onClick={() => unwish(c)}
+                        disabled={busy === c.id}
+                      >
+                        희망 등록됨 · 취소
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-sm flex-1 rounded-lg bg-amber-500 font-medium text-white hover:bg-amber-600"
+                        onClick={() => wish(c)}
+                        disabled={busy === c.id}
+                      >
+                        빈자리 희망
+                      </button>
+                    )
                   ) : (
-                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed || c.is_full || locked}>
-                      {locked ? '마감' : closed ? courseStatusLabel(c.status) : c.is_full ? '정원 마감' : '신청'}
+                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed || locked}>
+                      {locked ? '마감' : closed ? courseStatusLabel(c.status) : '신청'}
                     </button>
                   )}
                 </div>

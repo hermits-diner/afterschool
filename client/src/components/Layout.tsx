@@ -120,9 +120,16 @@ export default function Layout({ nav, children }: { nav: NavItem[]; children: Re
             {semesterLabel}
           </div>
           <div className="flex items-center gap-4">
-            <NavLink to="settings/password" className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800">
+            <NavLink to="settings/password" className="hidden items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 sm:flex">
               <Icons.key size={15} /> 비밀번호 변경
             </NavLink>
+            {/* 로그아웃 상시 노출 — 공용 PC에서 신청 후 바로 나갈 수 있게 */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+            >
+              <Icons.logout size={15} /> 로그아웃
+            </button>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700 ring-2 ring-white">
               {user?.name?.[0]}
             </div>
