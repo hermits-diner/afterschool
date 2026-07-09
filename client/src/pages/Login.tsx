@@ -51,19 +51,19 @@ export default function Login() {
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
-      {/* Brand panel — 배경 이미지 + 동기부여 문구 */}
+      {/* Brand panel — 배경 이미지 + 동기부여 문구 + 활동 사진 콜라주 */}
       <div className="relative hidden flex-1 items-center justify-center overflow-hidden bg-brand-900 p-12 text-white lg:flex">
-        {/* 배경 이미지 (Unsplash) — 로딩 전·실패 시에는 brand-900 배경 유지 */}
+        {/* 배경 이미지 (Unsplash) — 켄번즈 느린 줌. 로딩 전·실패 시에는 brand-900 배경 유지 */}
         <img
           src="https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1800&q=80"
           alt=""
-          className="absolute inset-0 h-full w-full object-cover"
+          className="animate-kenburns absolute inset-0 h-full w-full object-cover"
         />
         {/* 가독성 오버레이 */}
         <div className="absolute inset-0 bg-gradient-to-br from-brand-950/90 via-brand-900/70 to-brand-950/85" />
 
-        <div className="relative max-w-lg">
-          <div className="anim-fade-up mb-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+        <div className="relative max-w-xl pb-16">
+          <div className="anim-fade-up mb-8 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
             <GraduationCap size={34} />
           </div>
           <h1 className="anim-fade-up anim-delay-1 text-4xl font-bold leading-snug">
@@ -76,6 +76,40 @@ export default function Login() {
             <br />
             좋아하는 것을, 지금 시작하세요.
           </p>
+
+          {/* 활동 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
+          <div className="anim-fade-up anim-delay-3 mt-12 flex items-end gap-5">
+            <img
+              src="https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=400&q=75"
+              alt="스포츠 활동"
+              className="animate-float h-44 w-36 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+            />
+            <img
+              src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=75"
+              alt="미술 활동"
+              className="animate-float h-52 w-40 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-1.8s' }}
+            />
+            <img
+              src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=400&q=75"
+              alt="과학 실험"
+              className="animate-float h-44 w-36 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-3.4s' }}
+            />
+          </div>
+        </div>
+
+        {/* 강좌 키워드 무한 스크롤 띠 */}
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t border-white/10 bg-black/20 py-3 backdrop-blur-sm">
+          <div className="animate-marquee flex w-max gap-10 whitespace-nowrap text-sm font-medium text-white/60">
+            {[0, 1].map((dup) => (
+              <span key={dup} className="flex gap-10">
+                <span>⚽ 축구</span><span>🏀 농구</span><span>💻 코딩</span><span>🎸 밴드</span>
+                <span>🎨 미술</span><span>💃 댄스</span><span>🧪 과학실험</span><span>📚 독서토론</span>
+                <span>🎹 피아노</span><span>🏐 배구</span><span>🎬 영상제작</span><span>✏️ 논술</span>
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 

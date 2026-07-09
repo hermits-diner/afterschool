@@ -80,15 +80,25 @@ table {
   33% { transform: translate(24px, -18px) scale(1.06); }
   66% { transform: translate(-14px, 12px) scale(0.97); }
 }
+@keyframes kenburns {
+  from { transform: scale(1); }
+  to { transform: scale(1.1); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 .animate-float { animation: float 5.5s ease-in-out infinite; }
 .animate-blob { animation: blob 14s ease-in-out infinite; }
+.animate-kenburns { animation: kenburns 26s ease-in-out infinite alternate; }
+.animate-marquee { animation: marquee 30s linear infinite; }
 .anim-fade-up { animation: fadeUp 0.55s ease-out both; }
 .anim-delay-1 { animation-delay: 0.12s; }
 .anim-delay-2 { animation-delay: 0.24s; }
 .anim-delay-3 { animation-delay: 0.36s; }
 .anim-delay-4 { animation-delay: 0.5s; }
 @media (prefers-reduced-motion: reduce) {
-  .animate-float, .animate-blob, .anim-fade-up { animation: none; }
+  .animate-float, .animate-blob, .animate-kenburns, .animate-marquee, .anim-fade-up { animation: none; }
 }
 
 /* ---- Print (명렬표 / 출석부) ---- */
