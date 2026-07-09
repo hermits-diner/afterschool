@@ -13,14 +13,16 @@ import {
 
 const router = Router();
 
-// Student: my enrollments (with course info)
+// Student: my enrollments (with course info) — 활성 세션만.
+// 지난 세션 기록은 보존되지만 학생 화면에는 보이지 않는다.
 router.get('/mine', authRequired, requireRole('student'), ah(async (req, res) => {
+  const semester = await getActiveSemester();
   const rows = await all(
     `SELECT e.id AS enrollment_id, e.status AS enrollment_status, e.created_at AS enrolled_at, c.*
      FROM enrollments e JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ? AND e.status != 'cancelled'
+     WHERE e.student_id = ? AND e.status != 'cancelled' AND c.semester = ?
      ORDER BY c.day_of_week, c.start_time`,
-    [req.user.id]
+    [req.user.id, semester.code]
   );
   const decorated = await decorateCourses(rows);
   const courses = decorated.map((r, i) => ({

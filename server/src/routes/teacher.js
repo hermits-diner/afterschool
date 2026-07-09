@@ -34,18 +34,20 @@ const ownedCourse = ah(async (req, res, next) => {
   next();
 });
 
-// My assigned courses
+// My assigned courses — 활성 세션만 (지난 세션 강좌는 기록 보존, 화면 미노출)
 router.get('/courses', ah(async (req, res) => {
+  const semester = await getSetting('semester');
   const rows = await all(
-    'SELECT * FROM courses WHERE teacher_id = ? ORDER BY day_of_week, start_time',
-    [req.user.id]
+    'SELECT * FROM courses WHERE teacher_id = ? AND semester = ? ORDER BY day_of_week, start_time',
+    [req.user.id, semester]
   );
   res.json({ courses: await decorateCourses(rows) });
 }));
 
-// Dashboard summary for the teacher
+// Dashboard summary for the teacher — 활성 세션만
 router.get('/summary', ah(async (req, res) => {
-  const courses = await all('SELECT * FROM courses WHERE teacher_id = ?', [req.user.id]);
+  const semester = await getSetting('semester');
+  const courses = await all('SELECT * FROM courses WHERE teacher_id = ? AND semester = ?', [req.user.id, semester]);
   const courseIds = courses.map((c) => c.id);
   let totalStudents = 0;
   if (courseIds.length) {
