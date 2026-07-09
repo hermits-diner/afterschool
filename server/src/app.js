@@ -53,9 +53,10 @@ app.get('/api/meta', authRequired, ah(async (req, res) => {
   });
 }));
 
-// 교과군 목록 — 강좌 개설 폼(강사/관리자)에서 사용.
+// 교과군 목록 — 강좌 개설 폼(강사/관리자)에서 사용. 활성 세션의 교과군만 반환.
 app.get('/api/groups', authRequired, ah(async (req, res) => {
-  const rows = await all('SELECT * FROM course_groups ORDER BY name');
+  const semester = await getSetting('semester');
+  const rows = await all('SELECT * FROM course_groups WHERE semester = ? ORDER BY name', [semester]);
   res.json({
     groups: rows.map((g) => ({ id: g.id, name: g.name, schedule: JSON.parse(g.schedule) })),
   });

@@ -14,8 +14,9 @@ export function periodLabel(from: number, to: number) {
   return from === to ? `${from}교시` : `${from}~${to}교시`;
 }
 
+// 축약 표기: 월 7교시 → '월7', 월 7~9교시 → '월7~9'
 export function slotLabel(s: Slot) {
-  return `${s.day} ${periodLabel(s.from, s.to)}`;
+  return s.from === s.to ? `${s.day}${s.from}` : `${s.day}${s.from}~${s.to}`;
 }
 
 export function scheduleLabel(slots?: Slot[] | null) {

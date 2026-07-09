@@ -118,9 +118,11 @@ const SCHEMA = [
   )`,
   `CREATE TABLE IF NOT EXISTS course_groups (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    name      TEXT NOT NULL UNIQUE,           -- 교과군 이름 (예: 'A유형')
+    name      TEXT NOT NULL,                  -- 교과군 이름 (예: 'A유형')
+    semester  TEXT NOT NULL,                  -- 세션별 분리 — 같은 이름도 세션이 다르면 허용
     schedule  TEXT NOT NULL,                  -- JSON [{day,from,to}] — 비연속 교시/복수 요일 허용
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (name, semester)
   )`,
   `CREATE TABLE IF NOT EXISTS course_files (
     course_id   INTEGER PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
@@ -214,6 +216,30 @@ export async function initSchema() {
       args: [k, String(v)],
     }))
   );
+
+  // course_groups 세션별 분리 마이그레이션 — 구버전(전역, name UNIQUE) 테이블을
+  // (name, semester) 복합 UNIQUE 구조로 재구성하고 기존 교과군은 활성 세션에 귀속시킨다.
+  const cgDef = await get("SELECT sql FROM sqlite_master WHERE type='table' AND name='course_groups'");
+  if (cgDef && !/semester/.test(cgDef.sql)) {
+    const activeCode = (await getSetting('semester')) || '';
+    await batch([
+      `CREATE TABLE course_groups_new (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        name      TEXT NOT NULL,
+        semester  TEXT NOT NULL,
+        schedule  TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (name, semester)
+      )`,
+      {
+        sql: `INSERT INTO course_groups_new (id, name, semester, schedule, created_at)
+              SELECT id, name, ?, schedule, created_at FROM course_groups`,
+        args: [activeCode],
+      },
+      'DROP TABLE course_groups',
+      'ALTER TABLE course_groups_new RENAME TO course_groups',
+    ]);
+  }
 
   // Migrate the active semester (+ legacy flat settings) into the semesters table.
   const active = await getSetting('semester');

@@ -139,13 +139,16 @@ const groupSchema = z.object({
   schedule: z.array(groupSlotSchema).min(1, '교시를 하나 이상 선택하세요.').max(20),
 });
 
+// 교과군은 활성 세션에 귀속 — 세션이 바뀌면 그 세션의 교과군을 새로 관리한다.
 router.post('/groups', ah(async (req, res) => {
   const parsed = groupSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
-  const dupe = await get('SELECT id FROM course_groups WHERE name = ?', [parsed.data.name]);
-  if (dupe) return res.status(409).json({ error: '이미 존재하는 교과군 이름입니다.' });
-  const info = await run('INSERT INTO course_groups (name, schedule) VALUES (?, ?)', [
+  const semester = (await getSettings()).semester;
+  const dupe = await get('SELECT id FROM course_groups WHERE name = ? AND semester = ?', [parsed.data.name, semester]);
+  if (dupe) return res.status(409).json({ error: '이 세션에 이미 존재하는 교과군 이름입니다.' });
+  const info = await run('INSERT INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', [
     parsed.data.name,
+    semester,
     JSON.stringify(parsed.data.schedule),
   ]);
   res.status(201).json({ group: await get('SELECT * FROM course_groups WHERE id = ?', [info.lastInsertRowid]) });
@@ -422,6 +425,7 @@ router.delete('/semesters/:code', ah(async (req, res) => {
     { sql: `DELETE FROM course_files WHERE course_id IN (${inSemester})`, args },
     { sql: 'DELETE FROM courses WHERE semester = ?', args: [code] },
     { sql: 'DELETE FROM courses_trash WHERE semester = ?', args: [code] },
+    { sql: 'DELETE FROM course_groups WHERE semester = ?', args: [code] },
     { sql: 'DELETE FROM semesters WHERE code = ?', args: [code] },
   ]);
   res.json({ ok: true });
@@ -706,7 +710,7 @@ router.post('/courses/bulk', ah(async (req, res) => {
 
   const semester = await getActiveSemester();
   const defaultSessions = semester.default_sessions ?? 16;
-  const groups = await all('SELECT * FROM course_groups');
+  const groups = await all('SELECT * FROM course_groups WHERE semester = ?', [semester.code]);
   const teachers = await all("SELECT id, username, name FROM users WHERE role='teacher'");
   if (groups.length === 0) {
     return res.status(400).json({ error: '교과군이 없습니다. 교과군 관리에서 먼저 교과군(교시 블록)을 만들어 주세요.' });

@@ -105,11 +105,11 @@ export async function ensureSeed() {
     courseIds.push(info.lastInsertRowid);
   }
 
-  // 데모 교과군 — 관리자가 정의하고 강사는 개설 시 선택
+  // 데모 교과군 — 세션별 귀속. 관리자가 정의하고 강사는 개설 시 선택
   await batch([
-    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['A유형', JSON.stringify([{ day: '월', from: 8, to: 9 }, { day: '수', from: 8, to: 9 }])] },
-    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['B유형', JSON.stringify([{ day: '화', from: 8, to: 9 }, { day: '목', from: 8, to: 9 }])] },
-    { sql: 'INSERT OR IGNORE INTO course_groups (name, schedule) VALUES (?, ?)', args: ['C유형', JSON.stringify([{ day: '금', from: 8, to: 9 }])] },
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', args: ['A유형', semester, JSON.stringify([{ day: '월', from: 8, to: 9 }, { day: '수', from: 8, to: 9 }])] },
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', args: ['B유형', semester, JSON.stringify([{ day: '화', from: 8, to: 9 }, { day: '목', from: 8, to: 9 }])] },
+    { sql: 'INSERT OR IGNORE INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', args: ['C유형', semester, JSON.stringify([{ day: '금', from: 8, to: 9 }])] },
   ]);
 
   // Some enrollments in 전학년 courses (single transaction)

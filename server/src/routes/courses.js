@@ -82,10 +82,14 @@ function sortSlots(slots) {
 }
 
 // group_id/schedule 입력을 슬롯 배열로 해석. 반환: {slots, group_id} 또는 null(변경 없음).
+// 교과군은 세션별 — 활성 세션의 교과군만 선택할 수 있다.
 async function resolveSchedule(d) {
   if (d.group_id) {
     const g = await get('SELECT * FROM course_groups WHERE id = ?', [d.group_id]);
     if (!g) return { error: '선택한 교과군을 찾을 수 없습니다.' };
+    if (g.semester !== (await getSetting('semester'))) {
+      return { error: '다른 세션의 교과군입니다. 현재 세션의 교과군을 선택하세요.' };
+    }
     return { slots: sortSlots(JSON.parse(g.schedule)), group_id: g.id };
   }
   if (d.schedule && d.schedule.length) {
@@ -151,7 +155,7 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
     d.fee = 0; // 수강료는 관리자가 책정
     d.planned_sessions = (await getActiveSemester()).default_sessions ?? 16; // 세션 기본 계획 차시 자동 적용
     // 교과군이 정의되어 있으면 강사는 교과군으로만 시간 지정
-    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups')).c;
+    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups WHERE semester = ?', [await getSetting('semester')])).c;
     if (groupCount > 0) {
       if (!d.group_id) return res.status(400).json({ error: '교과군을 선택하세요.' });
       delete d.schedule;
@@ -193,7 +197,7 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   const d = parsed.data;
   if (req.user.role === 'teacher') {
     // 교과군이 정의되어 있으면 강사의 직접 슬롯 지정은 무시
-    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups')).c;
+    const groupCount = (await get('SELECT COUNT(*) c FROM course_groups WHERE semester = ?', [await getSetting('semester')])).c;
     if (groupCount > 0) delete d.schedule;
   }
   const resolved = await resolveSchedule(d);
