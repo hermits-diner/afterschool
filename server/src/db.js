@@ -77,6 +77,8 @@ const SCHEMA = [
     target_grade  INTEGER,
     fee           INTEGER NOT NULL DEFAULT 0,
     pay_rate      INTEGER NOT NULL DEFAULT 0,   -- 강사료 회당 단가(원)
+    planned_sessions INTEGER NOT NULL DEFAULT 0, -- 계획 차시(총 수업 횟수) — 정산 기본값
+    session_override INTEGER,                   -- 실시 회차 수동 입력값 (최우선)
     semester      TEXT NOT NULL,
     status        TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','closed','cancelled')),
     created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -151,6 +153,12 @@ export async function initSchema() {
     .catch(() => {});
   await client
     .execute('ALTER TABLE courses ADD COLUMN pay_rate INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
+  await client
+    .execute('ALTER TABLE courses ADD COLUMN session_override INTEGER')
+    .catch(() => {});
+  await client
+    .execute('ALTER TABLE courses ADD COLUMN planned_sessions INTEGER NOT NULL DEFAULT 0')
     .catch(() => {});
   await batch(
     Object.entries(DEFAULT_SETTINGS).map(([k, v]) => ({

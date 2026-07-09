@@ -16,6 +16,7 @@ type Form = {
   room: string;
   target_grade: number;
   fee: number;
+  planned_sessions: number;
 };
 
 const emptyForm: Form = {
@@ -29,6 +30,7 @@ const emptyForm: Form = {
   room: '',
   target_grade: 0,
   fee: 0,
+  planned_sessions: 16,
 };
 
 export default function TeacherCourses() {
@@ -70,6 +72,7 @@ export default function TeacherCourses() {
       room: c.room || '',
       target_grade: c.target_grade,
       fee: c.fee,
+      planned_sessions: c.planned_sessions || 0,
     });
     setModalOpen(true);
   }
@@ -233,9 +236,15 @@ export default function TeacherCourses() {
               </select>
             </div>
           </div>
-          <div>
-            <label className="label">수강료(원)</label>
-            <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">수강료(원)</label>
+              <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className="label">계획 차시(총 수업 횟수)</label>
+              <input type="number" min={0} className="input" value={form.planned_sessions} onChange={(e) => setForm({ ...form, planned_sessions: Number(e.target.value) })} placeholder="예: 16" />
+            </div>
           </div>
           <div>
             <label className="label">강좌 소개</label>

@@ -30,6 +30,7 @@ export interface Course {
   target_grade: number;
   fee: number;
   pay_rate: number;
+  planned_sessions: number;
   semester: string;
   status: 'open' | 'closed' | 'cancelled';
   enrolled_count: number;

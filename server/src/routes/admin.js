@@ -64,7 +64,9 @@ router.get('/finance', ah(async (req, res) => {
   const sessionMap = Object.fromEntries(sessions.map((r) => [r.course_id, r.s]));
 
   const rows = decorated.map((c) => {
-    const sessionCount = sessionMap[c.id] || 0;
+    // 회차 우선순위: 수동 입력 > 계획 차시(기본: 전부 실시 간주) > 출석부 자동 집계
+    const autoCount = sessionMap[c.id] || 0;
+    const sessionCount = c.session_override ?? (c.planned_sessions || autoCount);
     const revenue = c.enrolled_count * c.fee;
     const teacherPay = c.pay_rate * sessionCount;
     return {
@@ -79,6 +81,10 @@ router.get('/finance', ah(async (req, res) => {
       revenue,
       pay_rate: c.pay_rate,
       session_count: sessionCount,
+      session_auto: autoCount,
+      planned_sessions: c.planned_sessions,
+      session_source:
+        c.session_override != null ? 'manual' : c.planned_sessions ? 'planned' : 'attendance',
       teacher_pay: teacherPay,
     };
   });
@@ -110,6 +116,17 @@ router.get('/finance', ah(async (req, res) => {
   totals.net = totals.revenue - totals.teacher_pay;
 
   res.json({ semester, courses: rows, byTeacher, totals });
+}));
+
+// 실시 회차 수동 입력/해제 — count: 숫자면 수동값 저장, null이면 출석부 자동 집계로 복원.
+router.patch('/courses/:id/sessions', ah(async (req, res) => {
+  const schema = z.object({ count: z.number().int().min(0).max(999).nullable() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '회차는 0 이상의 숫자여야 합니다.' });
+  const course = await get('SELECT id FROM courses WHERE id = ?', [req.params.id]);
+  if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  await run('UPDATE courses SET session_override = ? WHERE id = ?', [parsed.data.count, course.id]);
+  res.json({ ok: true });
 }));
 
 /* ---------------- Semester (세션) management ---------------- */

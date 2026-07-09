@@ -95,8 +95,8 @@ export async function ensureSeed() {
   const courseIds = [];
   for (const c of courseDefs) {
     const info = await run(
-      `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, semester, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
+      `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, planned_sessions, semester, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 16, ?, 'open')`,
       [c.title, c.category, c.description, teacherIds[c.teacher], c.capacity, c.day_of_week, c.start_time, c.end_time, c.room, c.target_grade, c.fee, semester]
     );
     courseIds.push(info.lastInsertRowid);

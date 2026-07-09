@@ -16,8 +16,18 @@ export interface FinanceRow {
   revenue: number;
   pay_rate: number;
   session_count: number;
+  session_auto: number;
+  planned_sessions: number;
+  session_source: 'manual' | 'planned' | 'attendance';
   teacher_pay: number;
 }
+
+const SOURCE_LABEL = { manual: '수동', planned: '계획', attendance: '출석부' } as const;
+const SOURCE_STYLE = {
+  manual: 'bg-brand-100 text-brand-700',
+  planned: 'bg-emerald-100 text-emerald-700',
+  attendance: 'bg-slate-100 text-slate-500',
+} as const;
 
 export interface FinanceData {
   semester: string;
@@ -38,10 +48,27 @@ const won = (n: number) => `${n.toLocaleString()}원`;
 export default function AdminFinance() {
   const toast = useToast();
   const [data, setData] = useState<FinanceData | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState('');
 
+  async function load() {
+    const r = await api.get<FinanceData>('/admin/finance');
+    setData(r);
+  }
   useEffect(() => {
-    api.get<FinanceData>('/admin/finance').then(setData);
+    load();
   }, []);
+
+  async function saveSessions(id: number, count: number | null) {
+    try {
+      await api.patch(`/admin/courses/${id}/sessions`, { count });
+      toast(count === null ? '출석부 자동 집계로 복원했습니다.' : `회차를 ${count}회로 설정했습니다.`, 'success');
+      setEditId(null);
+      load();
+    } catch {
+      toast('회차 저장에 실패했습니다.', 'error');
+    }
+  }
 
   function exportCsv() {
     if (!data) return;
@@ -69,7 +96,7 @@ export default function AdminFinance() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">정산 관리</h1>
           <p className="text-sm text-slate-500">
-            수강료 수입과 강사료(회당 단가 × 실시 회차)를 집계합니다. 실시 회차는 출석부 기록 날짜 수로 자동 계산됩니다.
+            수강료 수입과 강사료(회당 단가 × 회차)를 집계합니다. 회차는 기본적으로 계획 차시 전부 실시 기준입니다.
           </p>
         </div>
         <div className="flex gap-2">
@@ -159,7 +186,40 @@ export default function AdminFinance() {
                   <td className="td text-right">
                     {r.pay_rate === 0 ? <span className="badge bg-amber-100 text-amber-700">미책정</span> : won(r.pay_rate)}
                   </td>
-                  <td className="td text-center">{r.session_count}</td>
+                  <td className="td text-center">
+                    {editId === r.id ? (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={0}
+                          autoFocus
+                          className="input w-16 px-2 py-1 text-center text-xs"
+                          value={editVal}
+                          onChange={(e) => setEditVal(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && saveSessions(r.id, Number(editVal))}
+                        />
+                        <button className="btn-primary btn-sm" onClick={() => saveSessions(r.id, Number(editVal))}>저장</button>
+                        {r.session_source === 'manual' && (
+                          <button className="btn-ghost btn-sm" title="계획 차시/출석부 기준으로 복원" onClick={() => saveSessions(r.id, null)}>복원</button>
+                        )}
+                        <button className="btn-ghost btn-sm" onClick={() => setEditId(null)}>✕</button>
+                      </span>
+                    ) : (
+                      <button
+                        className="group inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 hover:bg-slate-100"
+                        title="클릭하여 회차 직접 입력"
+                        onClick={() => {
+                          setEditId(r.id);
+                          setEditVal(String(r.session_count));
+                        }}
+                      >
+                        <span className="font-medium">{r.session_count}</span>
+                        <span className={`badge ${SOURCE_STYLE[r.session_source]}`}>
+                          {SOURCE_LABEL[r.session_source]}
+                        </span>
+                      </button>
+                    )}
+                  </td>
                   <td className="td text-right font-semibold">{won(r.teacher_pay)}</td>
                 </tr>
               ))}
@@ -172,8 +232,9 @@ export default function AdminFinance() {
       </div>
 
       <div className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
-        💡 회당 강사료가 <b>미책정</b>인 강좌는 <b>강좌 관리 → 수정</b>에서 단가를 입력하세요.
-        실시 회차는 강사가 출석부를 기록하면 자동으로 올라갑니다.
+        💡 회차는 기본적으로 <b>계획 차시를 모두 실시한 것으로 계산</b>합니다 (계획 뱃지).
+        보강·결강 등으로 실제 회차가 다르면 숫자를 <b>클릭해서 직접 입력</b>하세요 (수동이 항상 우선, 복원 가능).
+        회당 강사료가 <b>미책정</b>인 강좌는 강좌 관리 → 수정에서 단가를 입력하세요.
       </div>
     </div>
   );

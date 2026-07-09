@@ -18,6 +18,7 @@ type Form = {
   target_grade: number;
   fee: number;
   pay_rate: number;
+  planned_sessions: number;
 };
 
 const emptyForm: Form = {
@@ -33,6 +34,7 @@ const emptyForm: Form = {
   target_grade: 0,
   fee: 0,
   pay_rate: 0,
+  planned_sessions: 16,
 };
 
 export default function AdminCourses() {
@@ -75,6 +77,7 @@ export default function AdminCourses() {
       target_grade: c.target_grade,
       fee: c.fee,
       pay_rate: c.pay_rate || 0,
+      planned_sessions: c.planned_sessions || 0,
     });
     setModalOpen(true);
   }
@@ -275,9 +278,15 @@ export default function AdminCourses() {
               <input type="number" min={0} step={1000} className="input" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
             </div>
           </div>
-          <div>
-            <label className="label">회당 강사료(원) — 정산 관리에서 강사료 계산에 사용</label>
-            <input type="number" min={0} step={1000} className="input" value={form.pay_rate} onChange={(e) => setForm({ ...form, pay_rate: Number(e.target.value) })} placeholder="예: 40000" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="label">계획 차시(총 수업 횟수)</label>
+              <input type="number" min={0} className="input" value={form.planned_sessions} onChange={(e) => setForm({ ...form, planned_sessions: Number(e.target.value) })} placeholder="예: 16" />
+            </div>
+            <div>
+              <label className="label">회당 강사료(원) — 정산 계산용</label>
+              <input type="number" min={0} step={1000} className="input" value={form.pay_rate} onChange={(e) => setForm({ ...form, pay_rate: Number(e.target.value) })} placeholder="예: 40000" />
+            </div>
           </div>
           <div>
             <label className="label">강좌 소개</label>

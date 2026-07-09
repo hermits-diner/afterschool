@@ -62,6 +62,7 @@ const courseSchema = z.object({
   target_grade: z.number().int().min(0).max(3).default(0),
   fee: z.number().int().min(0).default(0),
   pay_rate: z.number().int().min(0).default(0), // 강사료 회당 단가(원) — 관리자만 설정
+  planned_sessions: z.number().int().min(0).max(999).default(0), // 계획 차시(총 수업 횟수)
   semester: z.string().optional(),
   status: z.enum(['open', 'closed', 'cancelled']).optional(),
 });
@@ -81,6 +82,7 @@ function courseValues(d) {
     d.target_grade,
     d.fee,
     d.pay_rate ?? 0,
+    d.planned_sessions ?? 0,
     d.status,
   ];
 }
@@ -101,8 +103,8 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
   }
   const info = await run(
     `INSERT INTO courses
-     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, pay_rate, status, semester)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, fee, pay_rate, planned_sessions, status, semester)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       ...courseValues({ ...d, status: d.status || 'open' }),
       d.semester || (await getSetting('semester')),
@@ -131,7 +133,7 @@ router.put('/:id', authRequired, requireRole('admin', 'teacher'), ah(async (req,
   }
   await run(
     `UPDATE courses SET title=?, category=?, description=?, teacher_id=?, capacity=?,
-     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, fee=?, pay_rate=?, status=?
+     day_of_week=?, start_time=?, end_time=?, room=?, target_grade=?, fee=?, pay_rate=?, planned_sessions=?, status=?
      WHERE id=?`,
     [...courseValues(merged), existing.id]
   );
