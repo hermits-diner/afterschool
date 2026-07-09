@@ -551,6 +551,94 @@ router.delete('/users/:id', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+/* ---------------- Course bulk registration ---------------- */
+const DAY_ORDER = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4 };
+
+// Bulk-register courses (admin): 교과군 이름으로 시간 배정, 강사는 아이디 또는 이름으로 매칭.
+router.post('/courses/bulk', ah(async (req, res) => {
+  const schema = z.object({
+    courses: z
+      .array(
+        z.object({
+          title: z.string().min(1),
+          teacher: z.string().optional(), // 아이디 또는 이름 — 빈값이면 미배정
+          category: z.string().optional(),
+          group: z.string().optional(), // 교과군 이름
+          capacity: z.number().int().min(1).max(200).optional(),
+          target_grades: z.array(z.number().int().min(1).max(3)).max(3).optional(),
+          fee: z.number().int().min(0).optional(),
+          pay_rate: z.number().int().min(0).optional(),
+        })
+      )
+      .min(1)
+      .max(200),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+
+  const semester = await getActiveSemester();
+  const defaultSessions = semester.default_sessions ?? 16;
+  const groups = await all('SELECT * FROM course_groups');
+  const teachers = await all("SELECT id, username, name FROM users WHERE role='teacher'");
+  if (groups.length === 0) {
+    return res.status(400).json({ error: '교과군이 없습니다. 교과군 관리에서 먼저 교과군(교시 블록)을 만들어 주세요.' });
+  }
+
+  const created = [];
+  const skipped = [];
+  for (const c of parsed.data.courses) {
+    const skip = (reason) => skipped.push({ title: c.title, reason });
+
+    // 강사 매칭: 아이디 정확 일치 → 이름 일치(동명이인이면 오류)
+    let teacherId = null;
+    if (c.teacher) {
+      const byUsername = teachers.filter((t) => t.username === c.teacher);
+      const byName = teachers.filter((t) => t.name === c.teacher);
+      const match = byUsername.length ? byUsername : byName;
+      if (match.length === 0) { skip(`강사 '${c.teacher}'를 찾을 수 없음`); continue; }
+      if (match.length > 1) { skip(`강사 '${c.teacher}' 동명이인 — 아이디로 입력하세요`); continue; }
+      teacherId = match[0].id;
+    }
+
+    // 교과군 매칭 (이름 정확 일치)
+    if (!c.group) { skip('교과군 미지정'); continue; }
+    const group = groups.find((g) => g.name === c.group.trim());
+    if (!group) { skip(`교과군 '${c.group}'을 찾을 수 없음`); continue; }
+
+    const dupe = await get('SELECT id FROM courses WHERE title = ? AND semester = ?', [c.title, semester.code]);
+    if (dupe) { skip('동일한 강좌명이 이미 존재'); continue; }
+
+    const slots = JSON.parse(group.schedule).sort((a, b) => DAY_ORDER[a.day] - DAY_ORDER[b.day] || a.from - b.from);
+    const first = slots[0];
+    const gradeArr = [...new Set(c.target_grades || [])].sort();
+    const allGrades = gradeArr.length === 0 || gradeArr.length >= 3;
+    await run(
+      `INSERT INTO courses
+       (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
+       VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+      [
+        c.title,
+        c.category || '기타',
+        teacherId,
+        c.capacity ?? 20,
+        first.day,
+        PERIOD_TIMES[first.from][0],
+        PERIOD_TIMES[first.to][1],
+        !allGrades && gradeArr.length === 1 ? gradeArr[0] : 0,
+        allGrades ? '' : gradeArr.join(','),
+        c.fee ?? 0,
+        c.pay_rate ?? 0,
+        defaultSessions,
+        JSON.stringify(slots),
+        group.id,
+        semester.code,
+      ]
+    );
+    created.push({ title: c.title, group: group.name });
+  }
+  res.status(201).json({ created, skipped });
+}));
+
 /* ---------------- Enrollment management ---------------- */
 // Roster for any course (신청순 — 대기 순번 확인용)
 router.get('/courses/:id/roster', ah(async (req, res) => {

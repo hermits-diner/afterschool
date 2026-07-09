@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
@@ -22,6 +22,18 @@ type Form = {
   fee: number;
   pay_rate: number;
   planned_sessions: number;
+};
+
+// 일괄 등록 한 줄 → 강좌 객체. 강좌명에 공백이 있으므로 탭/쉼표로 구분한다.
+type BulkCourseRow = {
+  title: string;
+  teacher?: string;
+  category?: string;
+  group?: string;
+  capacity?: number;
+  target_grades?: number[];
+  fee?: number;
+  pay_rate?: number;
 };
 
 const emptyForm: Form = {
@@ -54,6 +66,10 @@ export default function AdminCourses() {
   const [rosterCourse, setRosterCourse] = useState<Course | null>(null);
   const [roster, setRoster] = useState<any[]>([]);
   const [saving, setSaving] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkResult, setBulkResult] = useState<{ created: any[]; skipped: any[] } | null>(null);
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   async function load() {
     const r = await api.get<{ courses: Course[] }>('/courses');
@@ -98,6 +114,64 @@ export default function AdminCourses() {
     toast('교과군이 삭제되었습니다.', 'success');
     loadGroups();
     load();
+  }
+
+  /* ---------- 강좌 일괄 등록 ---------- */
+  const bulkRows = useMemo<{ rows: BulkCourseRow[]; errors: string[] }>(() => {
+    const rows: BulkCourseRow[] = [];
+    const errors: string[] = [];
+    bulkText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .forEach((line, idx) => {
+        // 탭(엑셀 붙여넣기) 우선, 없으면 쉼표 구분. '-' 또는 빈칸 = 생략.
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(','))
+          .map((p) => p.trim())
+          .map((p) => (p === '-' ? '' : p));
+        const [title, teacher, category, group, capacity, grades, fee, payRate] = parts;
+        const err = (msg: string) => errors.push(`${idx + 1}행: ${msg}`);
+        if (!title) return err('강좌명이 없습니다.');
+        if (!group) return err(`'${title}' — 교과군이 없습니다.`);
+        if (category && !CATEGORIES.includes(category)) return err(`'${title}' — 교과는 ${CATEGORIES.join('/')} 중 하나여야 합니다.`);
+        const num = (v: string | undefined, label: string) => {
+          if (!v) return undefined;
+          const n = Number(v.replace(/[,원]/g, ''));
+          if (!Number.isInteger(n) || n < 0) { err(`'${title}' — ${label}이(가) 숫자가 아닙니다.`); return undefined; }
+          return n;
+        };
+        // 대상학년: '12'·'1·2'·'1/2' 등에서 1~3 숫자 추출, '전학년'/빈칸 = 전체
+        const target_grades = grades && !grades.includes('전')
+          ? [...new Set(grades.match(/[1-3]/g)?.map(Number) || [])]
+          : [];
+        rows.push({
+          title,
+          teacher: teacher || undefined,
+          category: category || undefined,
+          group,
+          capacity: num(capacity, '정원'),
+          target_grades,
+          fee: num(fee, '수강료'),
+          pay_rate: num(payRate, '회당 강사료'),
+        });
+      });
+    return { rows, errors };
+  }, [bulkText]);
+
+  async function submitBulk() {
+    if (bulkRows.rows.length === 0) return toast('등록할 강좌가 없습니다.', 'error');
+    if (bulkRows.errors.length > 0) return toast('형식 오류를 먼저 해결하세요.', 'error');
+    setBulkSaving(true);
+    try {
+      const r = await api.post<{ created: any[]; skipped: any[] }>('/admin/courses/bulk', { courses: bulkRows.rows });
+      setBulkResult(r);
+      setBulkText('');
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '일괄 등록에 실패했습니다.', 'error');
+    } finally {
+      setBulkSaving(false);
+    }
   }
 
   function openCreate() {
@@ -205,6 +279,9 @@ export default function AdminCourses() {
           <button className="btn-secondary" onClick={() => { setGroupForm({ id: null, name: '', schedule: [] }); setGroupModal(true); }}>
             <Icons.calendar size={16} /> 교과군 관리
           </button>
+          <button className="btn-secondary" onClick={() => { setBulkResult(null); setBulkOpen(true); }}>
+            <Icons.users size={16} /> 일괄 등록
+          </button>
           <button className="btn-primary" onClick={openCreate}>
             <Icons.plus size={16} /> 강좌 개설
           </button>
@@ -280,6 +357,135 @@ export default function AdminCourses() {
           </div>
         </div>
       )}
+
+      {/* 교과군 관리 모달 — 시간표 양식으로 교시 블록을 지정 */}
+      <Modal open={groupModal} onClose={() => setGroupModal(false)} title="교과군 관리" size="lg">
+        <div className="space-y-5">
+          <p className="text-sm text-slate-500">
+            교과군은 강좌들이 공유하는 <b>교시 블록</b>입니다. 강사는 강좌 개설 시 교과군을 선택해 시간을 배정받고,
+            교과군의 교시를 바꾸면 소속 강좌의 시간이 모두 함께 바뀝니다.
+          </p>
+
+          {groups.length > 0 && (
+            <div className="space-y-2">
+              {groups.map((g) => (
+                <div
+                  key={g.id}
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border-2 px-4 py-2.5 ${
+                    groupForm.id === g.id ? 'border-brand-400 bg-brand-50' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-800">{g.name}</span>
+                    <span className="ml-2 text-sm text-brand-700">{scheduleLabel(g.schedule)}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: g.id, name: g.name, schedule: g.schedule })}>
+                      수정
+                    </button>
+                    <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeGroup(g)}>삭제</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={saveGroup} className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-slate-800">{groupForm.id ? `교과군 수정 · ${groupForm.name}` : '새 교과군 만들기'}</h3>
+              {groupForm.id && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: null, name: '', schedule: [] })}>
+                  + 새로 만들기
+                </button>
+              )}
+            </div>
+            <div>
+              <label className="label">교과군 이름 *</label>
+              <input
+                className="input"
+                value={groupForm.name}
+                onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })}
+                placeholder="예: A군 (월·수 8~9교시)"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">교시 블록 * — 시간표에서 클릭해 선택</label>
+              <PeriodPicker value={groupForm.schedule} onChange={(v) => setGroupForm({ ...groupForm, schedule: v })} />
+            </div>
+            {groupForm.id && (
+              <p className="text-xs text-amber-600">⚠️ 저장하면 이 교과군 소속 강좌들의 수업 시간이 새 교시로 일괄 변경됩니다.</p>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setGroupModal(false)}>닫기</button>
+              <button className="btn-primary" disabled={groupSaving}>
+                {groupSaving ? '저장 중...' : groupForm.id ? '교과군 저장' : '교과군 생성'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
+
+      {/* 강좌 일괄 등록 모달 */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="강좌 일괄 등록" size="lg">
+        {bulkResult ? (
+          <div>
+            <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              ✅ <b>{bulkResult.created.length}개</b> 강좌 등록 완료
+              {bulkResult.skipped.length > 0 && <> · <b>{bulkResult.skipped.length}개</b> 건너뜀</>}
+            </div>
+            {bulkResult.skipped.length > 0 && (
+              <div className="mb-4 max-h-40 overflow-y-auto rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {bulkResult.skipped.map((s: any, i: number) => (
+                  <div key={i}>{s.title} — {s.reason}</div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setBulkResult(null)}>더 등록하기</button>
+              <button className="btn-primary" onClick={() => setBulkOpen(false)}>닫기</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              한 줄에 한 강좌씩 <b>강좌명, 강사, 교과, 교과군, 정원, [대상학년], [수강료], [회당강사료]</b> 순서로 입력하세요.
+              쉼표 또는 탭(엑셀 붙여넣기) 구분이며, 생략할 항목은 <b>-</b>로 채웁니다.
+              <br />강사는 <b>아이디 또는 이름</b>, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b> 적습니다.
+              대상학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 비우면 전학년입니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
+              <div className="mt-1 font-mono text-xs text-slate-500">
+                문학의 밤, 김국어, 국어, A군, 20, 12, 30000, 40000<br />
+                방송댄스, -, 기타, B군, 25 <span className="text-slate-400">← 강사 미배정 · 전학년 · 무료</span>
+              </div>
+            </div>
+            <textarea
+              className="input min-h-[160px] font-mono text-sm"
+              placeholder={'문학의 밤, 김국어, 국어, A군, 20, 12, 30000, 40000\n방송댄스, -, 기타, B군, 25'}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+            />
+            {bulkRows.errors.length > 0 && (
+              <div className="max-h-32 overflow-y-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {bulkRows.errors.map((e, i) => (
+                  <div key={i}>{e}</div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">
+                등록 대상 <b className="text-slate-800">{bulkRows.rows.length}개</b>
+                {bulkRows.errors.length > 0 && <span className="text-rose-600"> · 오류 {bulkRows.errors.length}건</span>}
+              </span>
+              <div className="flex gap-2">
+                <button className="btn-secondary" onClick={() => setBulkOpen(false)}>취소</button>
+                <button className="btn-primary" onClick={submitBulk} disabled={bulkSaving || bulkRows.rows.length === 0 || bulkRows.errors.length > 0}>
+                  {bulkSaving ? '등록 중...' : `${bulkRows.rows.length}개 등록`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Create/Edit modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? '강좌 수정' : '강좌 개설'} size="lg">

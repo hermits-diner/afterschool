@@ -4,8 +4,8 @@ import { api, Course } from '../../lib/api';
 import { PrintShell, PrintLoading } from '../../components/print';
 
 const LANDSCAPE = '@media print { @page { size: A4 landscape; margin: 10mm; } }';
-// 날짜는 강사가 수기로 기입 — 빈 날짜 칸 20개 고정
-const BLANK_COLS = 20;
+// 날짜는 강사가 수기로 기입 — 빈 날짜 칸 24개 고정
+const BLANK_COLS = 24;
 
 // Printable attendance book (출석부) — students × blank date columns grid.
 export default function PrintAttendance() {
