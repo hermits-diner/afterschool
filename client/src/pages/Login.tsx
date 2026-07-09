@@ -77,24 +77,30 @@ export default function Login() {
             좋아하는 것을, 지금 시작하세요.
           </p>
 
-          {/* 활동 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
-          <div className="anim-fade-up anim-delay-3 mt-12 flex items-end gap-5">
+          {/* 교과 학습 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
+          <div className="anim-fade-up anim-delay-3 mt-12 flex items-end gap-4">
             <img
-              src="https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=400&q=75"
-              alt="스포츠 활동"
-              className="animate-float h-44 w-36 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=400&q=75"
+              alt="국어·독서"
+              className="animate-float h-40 w-32 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
             />
             <img
-              src="https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=400&q=75"
-              alt="미술 활동"
-              className="animate-float h-52 w-40 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-1.8s' }}
+              src="https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=400&q=75"
+              alt="수학"
+              className="animate-float h-48 w-36 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-1.2s' }}
+            />
+            <img
+              src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=400&q=75"
+              alt="영어·학습"
+              className="animate-float h-40 w-32 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-2.4s' }}
             />
             <img
               src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=400&q=75"
               alt="과학 실험"
-              className="animate-float h-44 w-36 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-3.4s' }}
+              className="animate-float h-48 w-36 -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-3.6s' }}
             />
           </div>
         </div>
@@ -104,9 +110,10 @@ export default function Login() {
           <div className="animate-marquee flex w-max gap-10 whitespace-nowrap text-sm font-medium text-white/60">
             {[0, 1].map((dup) => (
               <span key={dup} className="flex gap-10">
-                <span>⚽ 축구</span><span>🏀 농구</span><span>💻 코딩</span><span>🎸 밴드</span>
-                <span>🎨 미술</span><span>💃 댄스</span><span>🧪 과학실험</span><span>📚 독서토론</span>
-                <span>🎹 피아노</span><span>🏐 배구</span><span>🎬 영상제작</span><span>✏️ 논술</span>
+                <span>📖 수능 국어</span><span>✍️ 영어 독해</span><span>📐 수학 심화</span>
+                <span>🌏 사회탐구</span><span>🧪 과학탐구</span><span>📚 문학·독서</span>
+                <span>🗣️ 영어 회화</span><span>📝 논술</span><span>🧮 미적분</span>
+                <span>🔬 물리·화학 실험</span><span>🏛️ 한국사</span><span>⚽ 스포츠</span>
               </span>
             ))}
           </div>
@@ -211,7 +218,7 @@ export default function Login() {
           </div>
 
           <p className="mt-5 text-center text-sm text-slate-400">
-            © 2026 방과후학교 온라인 수강신청 시스템
+            방과후학교 온라인 수강신청 시스템
           </p>
         </div>
       </div>
