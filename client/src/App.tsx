@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAuth } from './context/AuthContext';
 import { Role } from './lib/api';
 import { Spinner } from './components/ui';
@@ -91,9 +92,10 @@ function HomeRedirect() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<HomeRedirect />} />
+    <>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<HomeRedirect />} />
 
       {/* Admin */}
       <Route element={<RequireRole role="admin" />}>
@@ -144,6 +146,8 @@ export default function App() {
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+      <SpeedInsights />
+    </>
   );
 }
