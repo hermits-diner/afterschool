@@ -175,8 +175,8 @@ export default function StudentCatalog() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="mb-5 flex flex-wrap gap-2">
+      {/* Filters — sticky: 긴 목록을 내려간 상태에서도 검색·필터 변경 가능 */}
+      <div className="sticky top-0 z-10 -mx-4 mb-5 flex flex-wrap gap-2 bg-slate-50/90 px-4 py-3 backdrop-blur-sm lg:-mx-8 lg:px-8">
         <input className="input w-full sm:w-56" placeholder="강좌명 검색" value={q} onChange={(e) => setQ(e.target.value)} />
         <select className="input w-32" value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="">전체 교과</option>
