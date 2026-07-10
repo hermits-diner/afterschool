@@ -4,6 +4,7 @@ import { api, Course } from '../../lib/api';
 import { EmptyState, ProgressBar, CategoryBadge, PageHeader, StatBand, CardGridSkeleton } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
+import { courseDisplayTitle } from '../../lib/format';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -79,7 +80,7 @@ export default function TeacherDashboard() {
                     {c.day_of_week} {c.start_time}
                   </span>
                 </div>
-                <h3 className="mb-3 font-bold text-slate-900 transition-colors group-hover:text-brand-700">{c.title}</h3>
+                <h3 className="mb-3 font-bold text-slate-900 transition-colors group-hover:text-brand-700">{courseDisplayTitle(c)}</h3>
                 <div className="mb-1 flex justify-between text-xs text-slate-500">
                   <span>수강 인원</span>
                   <span className="font-semibold text-slate-700 [font-variant-numeric:tabular-nums]">

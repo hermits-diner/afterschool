@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { studentLabel } from '../../lib/format';
+import { courseDisplayTitle, studentLabel } from '../../lib/format';
 
 export default function TeacherRoster() {
   const location = useLocation() as any;
@@ -49,7 +49,7 @@ export default function TeacherRoster() {
                   selected === c.id ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                 }`}
               >
-                {c.title}
+                {courseDisplayTitle(c)}
               </button>
             ))}
           </div>
@@ -62,7 +62,7 @@ export default function TeacherRoster() {
                 <div className="card flex flex-wrap items-center gap-x-6 gap-y-2 p-4 text-sm">
                   <div className="flex items-center gap-2">
                     <CategoryBadge category={course.category} />
-                    <span className="font-bold text-slate-800">{course.title}</span>
+                    <span className="font-bold text-slate-800">{courseDisplayTitle(course)}</span>
                   </div>
                   <span className="text-slate-500">{course.schedule_label}</span>
                   <span className="text-slate-500">{course.room}</span>

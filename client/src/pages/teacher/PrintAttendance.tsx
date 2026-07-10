@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
 import { PrintShell, PrintLoading } from '../../components/print';
+import { courseDisplayTitle } from '../../lib/format';
 
 const LANDSCAPE = '@media print { @page { size: A4 landscape; margin: 10mm; } }';
 // 날짜는 강사가 수기로 기입 — 빈 날짜 칸 24개 고정
@@ -29,7 +30,7 @@ export default function PrintAttendance() {
     <PrintShell title="출석부" hint="출석부 미리보기 · 가로 방향 인쇄 권장" width="xl" pageStyle={LANDSCAPE}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
         <div className="flex flex-wrap gap-x-6 gap-y-1">
-          <span><b className="text-slate-500">강좌</b> {course.title}</span>
+          <span><b className="text-slate-500">강좌</b> {courseDisplayTitle(course)}</span>
           <span><b className="text-slate-500">강사</b> {teacher_name}</span>
           <span><b className="text-slate-500">교시</b> {course.schedule_label}</span>
           <span><b className="text-slate-500">인원</b> {students.length}명</span>

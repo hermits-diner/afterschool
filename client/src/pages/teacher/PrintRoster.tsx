@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, Course } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td, InfoCell } from '../../components/print';
-import { targetGradesLabel, studentShort } from '../../lib/format';
+import { courseDisplayTitle, targetGradesLabel, studentShort } from '../../lib/format';
 
 // Printable student name list (명렬표) for a course.
 export default function PrintRoster() {
@@ -26,7 +26,7 @@ export default function PrintRoster() {
         <tbody>
           <tr>
             <InfoCell head>강좌명</InfoCell>
-            <InfoCell colSpan={3}>{course.title}</InfoCell>
+            <InfoCell colSpan={3}>{courseDisplayTitle(course)}</InfoCell>
             <InfoCell head>담당강사</InfoCell>
             <InfoCell>{course.teacher_name}</InfoCell>
           </tr>

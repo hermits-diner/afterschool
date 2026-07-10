@@ -3,7 +3,7 @@ import { api, Course, CourseGroup, ApiError, fileToBase64, downloadCourseFile } 
 import { Modal, CardGridSkeleton, EmptyState, CategoryBadge, StatusBadge, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
-import { CATEGORIES, targetGradesLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
+import { CATEGORIES, courseDisplayTitle, targetGradesLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
 import GradePicker from '../../components/GradePicker';
 import { useToast } from '../../context/ToastContext';
 
@@ -195,7 +195,7 @@ export default function TeacherCourses() {
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CategoryBadge category={c.category} />
-                  <h3 className="font-bold text-slate-900">{c.title}</h3>
+                  <h3 className="font-bold text-slate-900">{courseDisplayTitle(c)}</h3>
                 </div>
                 <StatusBadge status={c.status} />
               </div>

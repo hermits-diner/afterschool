@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { Spinner, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { studentShort } from '../../lib/format';
+import { courseDisplayTitle, studentShort } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 type Status = 'present' | 'absent' | 'late' | 'excused';
@@ -85,7 +85,7 @@ export default function TeacherAttendance() {
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <select className="input w-56" value={selected ?? ''} onChange={(e) => setSelected(Number(e.target.value))}>
           {courses.map((c) => (
-            <option key={c.id} value={c.id}>{c.title} ({c.day_of_week})</option>
+            <option key={c.id} value={c.id}>{courseDisplayTitle(c)} ({c.day_of_week})</option>
           ))}
         </select>
         <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
