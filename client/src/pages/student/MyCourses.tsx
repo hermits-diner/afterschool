@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, Course, ApiError } from '../../lib/api';
-import { Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
+import { CardGridSkeleton, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { formatFee } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useRegistrationOpen } from '../../lib/useSemester';
@@ -35,7 +35,7 @@ export default function StudentMyCourses() {
     }
   }
 
-  if (!mine) return <Spinner />;
+  if (!mine) return <CardGridSkeleton count={4} />;
   const totalFee = mine.filter((c) => c.enrollment_status === 'enrolled').reduce((s, c) => s + c.fee, 0);
 
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, Course, CourseGroup, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
-import { Modal, Spinner, EmptyState, CategoryBadge, StatusBadge, ProgressBar } from '../../components/ui';
+import { Modal, CardGridSkeleton, EmptyState, CategoryBadge, StatusBadge, ProgressBar } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
 import { CATEGORIES, targetGradesLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
@@ -172,7 +172,7 @@ export default function TeacherCourses() {
     if (annCourse) openAnn(annCourse);
   }
 
-  if (!courses) return <Spinner />;
+  if (!courses) return <CardGridSkeleton />;
 
   return (
     <div>

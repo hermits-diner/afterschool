@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import { Spinner, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
+import { TableSkeleton, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { enrollStatusLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
@@ -69,7 +69,7 @@ export default function AdminEnrollments() {
     URL.revokeObjectURL(url);
   }
 
-  if (!rows) return <Spinner />;
+  if (!rows) return <TableSkeleton />;
 
   return (
     <div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Spinner, EmptyState } from '../../components/ui';
+import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 
 export interface ClassStudent {
@@ -39,7 +39,7 @@ export default function AdminClassStatus() {
     });
   }, []);
 
-  if (!classes) return <Spinner />;
+  if (!classes) return <TableSkeleton />;
 
   const current = classes.find((c) => `${c.grade}-${c.class_no}` === selected);
   const applied = (s: ClassStudent) => s.enrollments.length > 0;

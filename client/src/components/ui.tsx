@@ -77,6 +77,53 @@ export function Stat({
   );
 }
 
+/* 스탯 밴드 — 하나의 카드를 세그먼트로 분할한 핵심 지표 영역 (대시보드 공용) */
+export interface StatItem {
+  label: string;
+  value: ReactNode;
+  unit?: string;
+  sub?: string;
+  icon?: ReactNode;
+}
+
+export function StatBand({ items, className = '' }: { items: StatItem[]; className?: string }) {
+  const cols: Record<number, string> = {
+    2: 'grid-cols-2',
+    3: 'grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-2 max-lg:divide-y lg:grid-cols-4',
+  };
+  return (
+    <div className={`card grid divide-slate-100 lg:divide-x ${cols[items.length] || cols[4]} ${className}`}>
+      {items.map((s) => (
+        <div key={s.label} className="group p-6 transition-colors hover:bg-slate-50/60">
+          <div className="flex items-center gap-2 text-slate-500">
+            {s.icon && <span className="text-brand-500/70 transition-colors group-hover:text-brand-600">{s.icon}</span>}
+            <span className="text-sm font-medium">{s.label}</span>
+          </div>
+          <div className="mt-2 flex items-baseline gap-1.5 [font-variant-numeric:tabular-nums]">
+            <span className="text-3xl font-bold tracking-tight text-slate-900">{s.value}</span>
+            {s.unit && <span className="text-sm font-medium text-slate-400">{s.unit}</span>}
+          </div>
+          {s.sub && <p className="mt-1 text-xs text-slate-400">{s.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 페이지 상단 제목 블록 — 모든 화면 공통 톤
+export function PageHeader({ title, sub, actions }: { title: string; sub?: string; actions?: ReactNode }) {
+  return (
+    <div className="anim-fade-up mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
+        {sub && <p className="mt-1 text-sm text-slate-500">{sub}</p>}
+      </div>
+      {actions && <div className="flex gap-2">{actions}</div>}
+    </div>
+  );
+}
+
 export function EmptyState({ message, sub }: { message: string; sub?: string }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">

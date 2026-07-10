@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, CourseGroup } from '../../lib/api';
-import { Modal, Spinner, EmptyState } from '../../components/ui';
+import { Modal, TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
 import { Slot, scheduleLabel } from '../../lib/format';
@@ -237,7 +237,7 @@ export default function AdminSettings() {
     }
   }
 
-  if (!semesters) return <Spinner />;
+  if (!semesters) return <TableSkeleton />;
 
   return (
     <div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Spinner, EmptyState } from '../../components/ui';
+import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { studentLabel } from '../../lib/format';
 
@@ -32,7 +32,7 @@ export default function AdminCancelled() {
     api.get<{ students: CancelledStudent[] }>('/admin/cancelled-enrollments').then((r) => setStudents(r.students));
   }, []);
 
-  if (!students) return <Spinner />;
+  if (!students) return <TableSkeleton />;
 
   // 반 목록 (학생이 있는 반만)
   const classKeys = [...new Set(students.map((s) => `${s.grade}-${s.class_no}`))].sort();

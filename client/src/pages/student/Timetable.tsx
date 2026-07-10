@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
-import { Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { TableSkeleton, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import Timetable from '../../components/Timetable';
 import { DAYS } from '../../lib/format';
@@ -12,7 +12,7 @@ export default function StudentTimetable() {
     api.get<{ courses: Course[] }>('/enrollments/mine').then((r) => setMine(r.courses));
   }, []);
 
-  if (!mine) return <Spinner />;
+  if (!mine) return <TableSkeleton rows={6} />;
   const enrolled = mine.filter((c) => c.enrollment_status === 'enrolled');
 
   return (

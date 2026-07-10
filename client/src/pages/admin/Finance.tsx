@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
-import { Stat, Spinner, EmptyState, CategoryBadge } from '../../components/ui';
+import { Stat, TableSkeleton, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { useToast } from '../../context/ToastContext';
 
@@ -133,7 +133,7 @@ export default function AdminFinance() {
     toast('CSV가 다운로드되었습니다.', 'success');
   }
 
-  if (!data) return <Spinner />;
+  if (!data) return <TableSkeleton />;
   const { courses, byTeacher, totals } = data;
 
   return (
