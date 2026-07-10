@@ -557,13 +557,13 @@ export default function AdminCourses() {
               <br />학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 <b>-</b>는 전학년, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b>,
               강사는 <b>아이디 또는 이름</b>으로 적습니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
               <div className="mt-1 font-mono text-xs text-slate-500">
-                12, A유형, 문학의 밤, 김국어, 국어, 20, 40000<br />
+                12, A유형, 문학의 밤, 김국어, 국어, 20<br />
                 -, B유형, 방송댄스, -, 기타, 25 <span className="text-slate-400">← 전학년 · 강사 미배정</span>
               </div>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
-              placeholder={'12, A유형, 문학의 밤, 김국어, 국어, 20, 40000\n-, B유형, 방송댄스, -, 기타, 25'}
+              placeholder={'12, A유형, 문학의 밤, 김국어, 국어, 20\n-, B유형, 방송댄스, -, 기타, 25'}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
