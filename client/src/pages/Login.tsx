@@ -85,8 +85,8 @@ export default function Login() {
           </p>
 
           {/* 교과 학습 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
-          {/* 유동 그리드 — 패널 폭에 맞춰 4장이 함께 줄어들어 창을 좁혀도 잘리지 않음 */}
-          <div className="anim-fade-up anim-delay-3 mt-12 grid grid-cols-4 items-end gap-4">
+          {/* 유동 그리드 — 홀수(3장) 배치(rule of odds), 패널 폭에 맞춰 함께 줄어들어 잘리지 않음 */}
+          <div className="anim-fade-up anim-delay-3 mt-12 grid grid-cols-3 items-end gap-5">
             <img
               src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=600&q=75"
               alt="국어·독서"
@@ -96,19 +96,13 @@ export default function Login() {
               src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=600&q=75"
               alt="수학 문제 풀이"
               className="animate-float aspect-[4/5] w-full rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-1.2s', marginBottom: '1.25rem' }}
+              style={{ animationDelay: '-1.6s', marginBottom: '1.5rem' }}
             />
             <img
               src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=75"
               alt="영어·학습"
               className="animate-float aspect-[4/5] w-full rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-2.4s' }}
-            />
-            <img
-              src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&q=75"
-              alt="과학 실험"
-              className="animate-float aspect-[4/5] w-full -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-3.6s', marginBottom: '1.25rem' }}
+              style={{ animationDelay: '-3.2s' }}
             />
           </div>
         </div>
@@ -144,17 +138,22 @@ export default function Login() {
             <br />
             만들어 가는 일입니다
           </h1>
-          {/* 사진 스트립 — 콜라주 축소판 */}
+          {/* 사진 스트립 — 콜라주 축소판, 홀수(3장) 배치(rule of odds) */}
           <div className="anim-fade-up anim-delay-2 flex shrink-0 items-end gap-2">
             <img
               src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=300&q=70"
               alt=""
-              className="h-16 w-12 -rotate-6 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
+              className="h-14 w-11 -rotate-6 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
             />
             <img
               src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=300&q=70"
               alt=""
-              className="h-20 w-14 rotate-3 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
+              className="h-[4.5rem] w-[3.25rem] rotate-2 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
+            />
+            <img
+              src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=300&q=70"
+              alt=""
+              className="h-14 w-11 rotate-6 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
             />
           </div>
         </div>
