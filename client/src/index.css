@@ -12,6 +12,10 @@ body,
   height: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   @apply bg-slate-50 text-slate-800 antialiased tracking-kr;
   word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
@@ -21,10 +25,30 @@ h1,
 h2,
 h3 {
   @apply tracking-tight;
+  text-wrap: balance; /* 제목 줄바꿈 균형 — 마지막 줄 한 단어 고아 방지 */
 }
 
 table {
   font-variant-numeric: tabular-nums; /* 숫자 열 정렬 */
+}
+
+tbody tr {
+  @apply transition-colors duration-150;
+}
+
+/* ---- 스켈레톤 로딩 (스피너 대체 — 레이아웃 형태 유지) ---- */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+.skeleton {
+  @apply rounded-lg;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e8edf4 37%, #f1f5f9 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
 }
 
 @layer components {

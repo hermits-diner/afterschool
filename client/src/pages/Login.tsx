@@ -166,10 +166,10 @@ export default function Login() {
                     setRole(r.key);
                     setError('');
                   }}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-2 py-4 text-center transition ${
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-2 py-4 text-center transition-all duration-200 ${
                     role === r.key
-                      ? 'border-brand-500 bg-brand-50'
-                      : 'border-slate-200 hover:border-slate-300'
+                      ? 'border-brand-500 bg-brand-50 shadow-lift'
+                      : 'border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card'
                   }`}
                 >
                   <r.icon size={26} strokeWidth={1.75} className={role === r.key ? 'text-brand-600' : 'text-slate-400'} />

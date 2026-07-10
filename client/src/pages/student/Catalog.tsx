@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
-import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../components/ui';
+import { Modal, EmptyState, CategoryBadge, ProgressBar, CardGridSkeleton } from '../../components/ui';
 import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel, sessionLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -129,7 +129,15 @@ export default function StudentCatalog() {
     setAnnouncements(r.announcements);
   }
 
-  if (!courses) return <Spinner />;
+  if (!courses) {
+    return (
+      <div>
+        <h1 className="mb-1 text-2xl font-bold text-slate-900">강좌 신청</h1>
+        <p className="mb-6 text-sm text-slate-500">강좌 목록을 불러오는 중입니다...</p>
+        <CardGridSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div>

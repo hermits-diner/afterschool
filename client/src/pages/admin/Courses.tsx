@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
-import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar } from '../../components/ui';
+import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar, TableSkeleton } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
 import { CATEGORIES, targetGradesLabel, studentLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
@@ -325,7 +325,15 @@ export default function AdminCourses() {
     load();
   }
 
-  if (!courses) return <Spinner />;
+  if (!courses) {
+    return (
+      <div>
+        <h1 className="mb-1 text-2xl font-bold text-slate-900">강좌 관리</h1>
+        <p className="mb-6 text-sm text-slate-500">강좌 목록을 불러오는 중입니다...</p>
+        <TableSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div>

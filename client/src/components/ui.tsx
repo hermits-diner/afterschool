@@ -63,7 +63,7 @@ export function Stat({
   icon?: ReactNode;
 }) {
   return (
-    <div className="card flex items-center gap-4 p-5 transition hover:shadow-soft">
+    <div className="card flex items-center gap-4 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft">
       {icon && (
         <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${accent || 'bg-brand-50 text-brand-600'}`}>
           {icon}
@@ -71,7 +71,7 @@ export function Stat({
       )}
       <div>
         <div className="text-sm text-slate-500">{label}</div>
-        <div className="text-2xl font-bold tracking-tight text-slate-900">{value}</div>
+        <div className="text-2xl font-bold tracking-tight text-slate-900 [font-variant-numeric:tabular-nums]">{value}</div>
       </div>
     </div>
   );
@@ -103,6 +103,54 @@ export function Spinner() {
   return (
     <div className="flex items-center justify-center py-20">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600" />
+    </div>
+  );
+}
+
+/* ---- 스켈레톤 로더 — 목록/카드 화면의 레이아웃 형태를 유지한 로딩 표시 ---- */
+
+// 카드 그리드 스켈레톤 (학생 카탈로그, 강사 내 강좌 등)
+export function CardGridSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="card space-y-3 p-5">
+          <div className="flex items-center justify-between">
+            <div className="skeleton h-5 w-14" />
+            <div className="skeleton h-4 w-12" />
+          </div>
+          <div className="skeleton h-5 w-3/4" />
+          <div className="skeleton h-4 w-full" />
+          <div className="skeleton h-4 w-2/3" />
+          <div className="skeleton h-2 w-full" />
+          <div className="flex gap-2 pt-1">
+            <div className="skeleton h-8 flex-1" />
+            <div className="skeleton h-8 flex-1" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 테이블 스켈레톤 (관리자 목록 화면)
+export function TableSkeleton({ rows = 8 }: { rows?: number }) {
+  return (
+    <div className="card overflow-hidden">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="skeleton h-4 w-1/3" />
+      </div>
+      <div className="divide-y divide-slate-100">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+            <div className="skeleton h-4 w-8" />
+            <div className="skeleton h-4 w-1/4" />
+            <div className="skeleton h-4 w-1/6" />
+            <div className="skeleton h-4 w-1/5" />
+            <div className="skeleton ml-auto h-4 w-16" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
