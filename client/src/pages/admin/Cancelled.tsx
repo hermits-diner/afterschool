@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { studentLabel } from '../../lib/format';
+import { courseDisplayTitle, studentLabel } from '../../lib/format';
 
 export interface CancelledStudent {
   student_id: number;
@@ -18,9 +18,9 @@ export interface CancelledStudent {
   }[];
 }
 
-// '강좌명 · 교과군 · 강사' 표기 (반별 현황과 동일한 형식)
+// '[교과군] 강좌명 · 강사' 표기 (반별 현황과 동일한 courseDisplayTitle 규칙)
 export function cancelledCourseLabel(c: CancelledStudent['courses'][number]) {
-  return [c.title, c.group_name, c.teacher_name].filter(Boolean).join(' · ');
+  return [courseDisplayTitle(c), c.teacher_name].filter(Boolean).join(' · ');
 }
 
 // 폐강 강좌를 신청했던 학생 — 추가 신청 안내 대상. 전체/반별 목록 + 인쇄.

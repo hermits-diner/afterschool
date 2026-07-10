@@ -216,6 +216,7 @@ router.get('/finance', ah(async (req, res) => {
     return {
       id: c.id,
       title: c.title,
+      group_name: c.group_name,
       category: c.category,
       status: c.status,
       teacher_id: c.teacher_id,

@@ -3,10 +3,12 @@ import { api } from '../../lib/api';
 import { Stat, TableSkeleton, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { useToast } from '../../context/ToastContext';
+import { courseDisplayTitle } from '../../lib/format';
 
 export interface FinanceRow {
   id: number;
   title: string;
+  group_name?: string | null;
   category: string;
   status: string;
   teacher_id: number | null;
@@ -120,7 +122,7 @@ export default function AdminFinance() {
     if (!data) return;
     const header = ['강좌', '교과', '강사', '수강인원', '수강료단가', '수강료수입', '회당강사료', '실시회차', '강사료'];
     const lines = data.courses.map((r) =>
-      [r.title, r.category, r.teacher_name, r.enrolled_count, r.fee, r.revenue, r.pay_rate, r.session_count, r.teacher_pay].join(',')
+      [courseDisplayTitle(r), r.category, r.teacher_name, r.enrolled_count, r.fee, r.revenue, r.pay_rate, r.session_count, r.teacher_pay].join(',')
     );
     const csv = '﻿' + [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -314,7 +316,7 @@ export default function AdminFinance() {
                   <td className="td">
                     <div className="flex items-center gap-2">
                       <CategoryBadge category={r.category} />
-                      <span className="font-medium">{r.title}</span>
+                      <span className="font-medium">{courseDisplayTitle(r)}</span>
                     </div>
                   </td>
                   <td className="td">{r.teacher_name}</td>

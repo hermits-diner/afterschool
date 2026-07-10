@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
 import type { FinanceData } from './Finance';
+import { courseDisplayTitle } from '../../lib/format';
 
 const won = (n: number) => n.toLocaleString();
 
@@ -37,7 +38,7 @@ export default function PrintFinance() {
           {courses.map((r, i) => (
             <tr key={r.id}>
               <Td center>{i + 1}</Td>
-              <Td>{r.title}</Td>
+              <Td>{courseDisplayTitle(r)}</Td>
               <Td center>{r.teacher_name}</Td>
               <Td center>{r.enrolled_count}</Td>
               <Td className="text-right">{won(r.pay_rate)}</Td>
