@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
+import { courseDisplayTitle } from '../../lib/format';
 
 export interface ClassStudent {
   id: number;
@@ -17,9 +18,9 @@ export interface ClassStudent {
   }[];
 }
 
-// '강좌명 · 교과군 · 강사' 표기
+// '[교과군] 강좌명 · 강사' 표기 — 다른 화면과 동일한 courseDisplayTitle 규칙
 export function enrollmentLabel(e: ClassStudent['enrollments'][number]) {
-  return [e.title, e.group_name, e.teacher_name].filter(Boolean).join(' · ');
+  return [courseDisplayTitle(e), e.teacher_name].filter(Boolean).join(' · ');
 }
 
 export interface ClassInfo {
