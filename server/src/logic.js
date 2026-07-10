@@ -101,13 +101,15 @@ export function coursesOverlap(a, b) {
   return ba.some((x) => bb.some((y) => x.day === y.day && timeOverlap(x.start, x.end, y.start, y.end)));
 }
 
-// Return the course that conflicts with `course` in the student's active schedule, or null.
+// Return the course that conflicts with `course` in the student's schedule, or null.
+// 같은 세션 안에서만 검사한다 — 세션(학기·특강)이 다르면 운영 기간이 달라 겹치지 않는다.
 export async function findScheduleConflict(studentId, course) {
   const rows = await all(
     `SELECT c.* FROM enrollments e
      JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ? AND c.status != 'cancelled'`,
-    [studentId, course.id]
+     WHERE e.student_id = ? AND e.status = 'enrolled' AND c.id != ? AND c.status != 'cancelled'
+       AND c.semester = ?`,
+    [studentId, course.id, course.semester]
   );
   for (const other of rows) {
     if (coursesOverlap(course, other)) return other;
@@ -115,11 +117,10 @@ export async function findScheduleConflict(studentId, course) {
   return null;
 }
 
-// 신청 기간 판정 — 분 단위 지원, 한국 시간(KST) 기준.
+// 세션 행 기준 접수 판정 — registration_open + 기간 내 (분 단위, 한국 시간 KST).
 // 값이 날짜만이면 시작일은 00:00부터, 종료일은 23:59까지로 해석.
-export async function isRegistrationOpen() {
-  const s = await getActiveSemester();
-  if (s.registration_open !== 'true') return false;
+export function isSemesterAccepting(s) {
+  if (!s || s.registration_open !== 'true') return false;
   const now = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 16); // 'YYYY-MM-DDTHH:MM' KST
   const start = s.registration_start
     ? s.registration_start.includes('T')
@@ -134,6 +135,25 @@ export async function isRegistrationOpen() {
   if (start && now < start) return false;
   if (end && now > end) return false;
   return true;
+}
+
+// 활성 세션의 접수 여부 (헤더·관리 화면용)
+export async function isRegistrationOpen() {
+  return isSemesterAccepting(await getActiveSemester());
+}
+
+// 지금 신청을 받는 모든 세션 — 활성 여부와 무관.
+// 정규 학기와 특강처럼 두 세션이 동시에 접수할 수 있다.
+export async function getAcceptingSemesters() {
+  const rows = await all('SELECT * FROM semesters');
+  return rows.filter(isSemesterAccepting);
+}
+
+// 학생 화면(카탈로그·내 신청)에 노출할 세션 코드 목록 — 활성 세션 + 접수중 세션.
+export async function getStudentVisibleSemesters() {
+  const active = await getActiveSemester();
+  const codes = new Set([active.code, ...(await getAcceptingSemesters()).map((s) => s.code)]);
+  return [...codes].filter(Boolean);
 }
 
 // Serialize a user row for API responses (drops password hash).

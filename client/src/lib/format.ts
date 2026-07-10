@@ -65,6 +65,14 @@ export function formatFee(fee: number) {
   return fee === 0 ? '무료' : `${fee.toLocaleString()}원`;
 }
 
+// '2026-1' → '2026학년도 1학기', '2026-여름' → '2026학년도 여름방학' (서버 semesterName과 동일 규칙)
+export function sessionLabel(code: string) {
+  const m = String(code).match(/^(\d{4})-(\d|여름|겨울|특강\d?)$/);
+  if (!m) return String(code);
+  const part = /^\d$/.test(m[2]) ? `${m[2]}학기` : m[2].startsWith('특강') ? m[2] : `${m[2]}방학`;
+  return `${m[1]}학년도 ${part}`;
+}
+
 // 강좌 소개 필수 내용 안내 예시문 (강좌 개설 폼 placeholder — 관리자·강사 공용)
 export const DESCRIPTION_HINT =
   '무엇을 배우는지·수업 방식·준비물을 간략히 적어 주세요.\n예) 수능 비문학 지문을 유형별로 분석하고 매주 실전 문제를 풀이합니다. 준비물: 필기구';

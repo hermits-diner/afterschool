@@ -4,9 +4,9 @@ import { all, get, run } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
 import {
   findScheduleConflict,
-  isRegistrationOpen,
+  isSemesterAccepting,
   decorateCourses,
-  getActiveSemester,
+  getStudentVisibleSemesters,
   parseTargetGrades,
   scheduleLabel,
 } from '../logic.js';
@@ -16,13 +16,15 @@ const router = Router();
 // Student: my enrollments (with course info) — 활성 세션만.
 // 지난 세션 기록은 보존되지만 학생 화면에는 보이지 않는다.
 router.get('/mine', authRequired, requireRole('student'), ah(async (req, res) => {
-  const semester = await getActiveSemester();
+  // 활성 세션 + 접수중 세션 모두 — 정규 학기와 특강을 동시에 신청하는 경우 지원
+  const codes = await getStudentVisibleSemesters();
+  const ph = codes.map(() => '?').join(',');
   const rows = await all(
     `SELECT e.id AS enrollment_id, e.status AS enrollment_status, e.created_at AS enrolled_at, c.*
      FROM enrollments e JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ? AND e.status != 'cancelled' AND c.semester = ?
+     WHERE e.student_id = ? AND e.status != 'cancelled' AND c.semester IN (${ph})
      ORDER BY c.day_of_week, c.start_time`,
-    [req.user.id, semester.code]
+    [req.user.id, ...codes]
   );
   const decorated = await decorateCourses(rows);
   const courses = decorated.map((r, i) => ({
@@ -40,14 +42,16 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '강좌를 선택하세요.' });
 
-  if (!(await isRegistrationOpen())) {
-    return res.status(403).json({ error: '현재 수강신청 기간이 아닙니다.' });
-  }
-
   const course = await get('SELECT * FROM courses WHERE id = ?', [parsed.data.course_id]);
   if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
   if (course.status !== 'open') {
     return res.status(400).json({ error: '신청할 수 없는 강좌입니다. (마감/폐강)' });
+  }
+
+  // 접수 판정은 강좌가 속한 세션 기준 — 두 세션(학기·특강)이 동시에 접수할 수 있다.
+  const semester = await get('SELECT * FROM semesters WHERE code = ?', [course.semester]);
+  if (!isSemesterAccepting(semester)) {
+    return res.status(403).json({ error: '이 강좌의 세션은 현재 수강신청 기간이 아닙니다.' });
   }
 
   const student = await get('SELECT * FROM users WHERE id = ?', [req.user.id]);
@@ -67,17 +71,17 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
     return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
   }
 
-  // max courses limit (세션별 설정) — 폐강 강좌 신청분은 한도에서 제외해 재신청이 가능하게 한다.
-  const semester = await getActiveSemester();
-  const max = Number(semester.max_courses_per_student || 3);
+  // max courses limit — 강좌가 속한 세션의 설정·신청분 기준 (세션별 독립 한도).
+  // 폐강 강좌 신청분은 한도에서 제외해 재신청이 가능하게 한다.
+  const max = Number(semester?.max_courses_per_student || 3);
   const activeRow = await get(
     `SELECT COUNT(*) AS c FROM enrollments e JOIN courses c ON c.id = e.course_id
      WHERE e.student_id = ? AND e.status = 'enrolled'
        AND c.status != 'cancelled' AND c.semester = ?`,
-    [student.id, semester.code]
+    [student.id, course.semester]
   );
   if (activeRow.c >= max) {
-    return res.status(400).json({ error: `최대 ${max}개까지 신청할 수 있습니다.` });
+    return res.status(400).json({ error: `이 세션에서는 최대 ${max}개까지 신청할 수 있습니다.` });
   }
 
   // schedule conflict
@@ -133,13 +137,14 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
    취소로 여석이 생겨도 자동 배정하지 않으며(선착순 원칙), 학생이 직접 재신청한다.
    관리자는 강좌별 희망 인원을 보고 증설·정원 조정을 판단한다. */
 
-// 내 희망 목록 (활성 세션)
+// 내 희망 목록 (활성 + 접수중 세션)
 router.get('/wishes/mine', authRequired, requireRole('student'), ah(async (req, res) => {
-  const semester = await getActiveSemester();
+  const codes = await getStudentVisibleSemesters();
+  const ph = codes.map(() => '?').join(',');
   const rows = await all(
     `SELECT w.course_id FROM course_wishes w JOIN courses c ON c.id = w.course_id
-     WHERE w.student_id = ? AND c.semester = ?`,
-    [req.user.id, semester.code]
+     WHERE w.student_id = ? AND c.semester IN (${ph})`,
+    [req.user.id, ...codes]
   );
   res.json({ course_ids: rows.map((r) => r.course_id) });
 }));
@@ -149,12 +154,14 @@ router.post('/wishes', authRequired, requireRole('student'), ah(async (req, res)
   const schema = z.object({ course_id: z.number().int() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: '강좌를 선택하세요.' });
-  if (!(await isRegistrationOpen())) {
-    return res.status(403).json({ error: '현재 수강신청 기간이 아닙니다.' });
-  }
   const course = await get('SELECT * FROM courses WHERE id = ?', [parsed.data.course_id]);
   if (!course || course.status !== 'open') {
     return res.status(400).json({ error: '희망을 등록할 수 없는 강좌입니다.' });
+  }
+  // 강좌가 속한 세션이 접수 중일 때만 희망 등록 가능
+  const semester = await get('SELECT * FROM semesters WHERE code = ?', [course.semester]);
+  if (!isSemesterAccepting(semester)) {
+    return res.status(403).json({ error: '이 강좌의 세션은 현재 수강신청 기간이 아닙니다.' });
   }
   const enrolled = await get(
     "SELECT id FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'enrolled'",
@@ -192,7 +199,10 @@ router.delete('/:courseId', authRequired, requireRole('student'), ah(async (req,
   );
   if (!enrollment) return res.status(404).json({ error: '신청 내역이 없습니다.' });
 
-  if (!(await isRegistrationOpen())) {
+  // 취소도 강좌가 속한 세션의 접수 기간 안에서만 허용
+  const course = await get('SELECT * FROM courses WHERE id = ?', [enrollment.course_id]);
+  const semester = course && (await get('SELECT * FROM semesters WHERE code = ?', [course.semester]));
+  if (!isSemesterAccepting(semester)) {
     return res.status(403).json({ error: '수강신청 기간이 아니어서 취소할 수 없습니다.' });
   }
 

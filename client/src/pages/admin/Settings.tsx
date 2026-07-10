@@ -281,16 +281,15 @@ export default function AdminSettings() {
                   </div>
                 </div>
                 <div className="flex gap-1.5">
-                  {s.is_active && (
-                    s.registration_open === 'true' ? (
-                      <button className="btn-sm rounded-lg bg-rose-600 px-3 font-medium text-white hover:bg-rose-700" onClick={() => toggleRegistration(s)}>
-                        신청 마감
-                      </button>
-                    ) : (
-                      <button className="btn-sm rounded-lg bg-emerald-600 px-3 font-medium text-white hover:bg-emerald-700" onClick={() => toggleRegistration(s)}>
-                        접수 재개
-                      </button>
-                    )
+                  {/* 접수 토글은 모든 세션에서 가능 — 활성 세션과 별개로 특강 등 두 세션 동시 접수 지원 */}
+                  {s.registration_open === 'true' ? (
+                    <button className="btn-sm rounded-lg bg-rose-600 px-3 font-medium text-white hover:bg-rose-700" onClick={() => toggleRegistration(s)}>
+                      신청 마감
+                    </button>
+                  ) : (
+                    <button className="btn-sm rounded-lg bg-emerald-600 px-3 font-medium text-white hover:bg-emerald-700" onClick={() => toggleRegistration(s)}>
+                      접수 재개
+                    </button>
                   )}
                   {!s.is_active && (
                     <button className="btn-secondary btn-sm" onClick={() => activate(s)}>활성화</button>
@@ -308,8 +307,12 @@ export default function AdminSettings() {
       )}
 
       <div className="mt-6 rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-500">
-        💡 학기가 끝나면: <b>새 세션 생성 → 활성화</b> 후, 지난 세션은 기록 보관용으로 두거나 <b>삭제</b>하면
+        💡 학기가 끝나면: <b>새 세션 생성(또는 복사) → 활성화</b> 후, 지난 세션은 기록 보관용으로 두거나 <b>삭제</b>하면
         해당 학기의 강좌·수강신청·출석·공지 데이터가 한 번에 정리됩니다. (활성 세션은 삭제할 수 없습니다)
+        <br />
+        💡 <b>두 세션 동시 접수</b>: 접수중(기간 내) 세션은 활성 여부와 관계없이 학생 신청을 받습니다.
+        정규 학기와 특강을 동시에 모집하려면 두 세션 모두 <b>접수중</b> 상태로 두세요.
+        접수 종료된 지난 세션은 <b>신청 마감</b>으로 바꿔야 학생 화면에서 사라집니다.
       </div>
 
       {/* ---------- 교과군 관리 — 시간표 양식으로 교시 블록 설정 ---------- */}

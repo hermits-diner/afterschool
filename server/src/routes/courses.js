@@ -2,15 +2,21 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, getSetting } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
-import { decorateCourse, decorateCourses, getActiveSemester, trashCourses, PERIOD_TIMES } from '../logic.js';
+import { decorateCourse, decorateCourses, getActiveSemester, getAcceptingSemesters, getStudentVisibleSemesters, trashCourses, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 
 // List courses (any authenticated user). Supports filters used by the student catalog.
 router.get('/', authRequired, ah(async (req, res) => {
   const { category, day, grade, q, semester, status } = req.query;
-  const clauses = ['semester = ?'];
-  const params = [semester || (await getSetting('semester'))];
+  // 학생은 활성 세션 + 접수중 세션의 강좌를 함께 본다 (정규+특강 동시 접수 지원).
+  // 관리자·강사는 기존대로 활성(또는 지정) 세션 기준.
+  const semList =
+    req.user.role === 'student' && !semester
+      ? await getStudentVisibleSemesters()
+      : [semester || (await getSetting('semester'))];
+  const clauses = [`semester IN (${semList.map(() => '?').join(',')})`];
+  const params = [...semList];
   if (status) {
     clauses.push('status = ?');
     params.push(status);
@@ -43,10 +49,13 @@ router.get('/', authRequired, ah(async (req, res) => {
     params.push(`%${q}%`, `%${q}%`);
   }
   const rows = await all(
-    `SELECT * FROM courses WHERE ${clauses.join(' AND ')} ORDER BY day_of_week, start_time`,
+    `SELECT * FROM courses WHERE ${clauses.join(' AND ')} ORDER BY semester, day_of_week, start_time`,
     params
   );
-  res.json({ courses: await decorateCourses(rows) });
+  // 강좌별 접수 가능 여부(소속 세션 기준) — 클라이언트가 신청 버튼 활성화에 사용
+  const acceptingCodes = new Set((await getAcceptingSemesters()).map((s) => s.code));
+  const decorated = await decorateCourses(rows);
+  res.json({ courses: decorated.map((c) => ({ ...c, accepting: acceptingCodes.has(c.semester) })) });
 }));
 
 router.get('/:id', authRequired, ah(async (req, res) => {

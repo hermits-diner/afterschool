@@ -2,18 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
 import { Modal, Spinner, EmptyState, CategoryBadge, ProgressBar } from '../../components/ui';
-import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel } from '../../lib/format';
+import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel, sessionLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
-import { useRegistrationOpen } from '../../lib/useSemester';
 import { Icons } from '../../components/icons';
 
 export default function StudentCatalog() {
   const toast = useToast();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const regOpen = useRegistrationOpen();
-  const locked = regOpen === false; // 접수 마감 — 신청·취소 잠금
+  // 접수 여부는 강좌 소속 세션 기준(c.accepting) — 두 세션(학기·특강) 동시 접수 지원.
   const [courses, setCourses] = useState<Course[] | null>(null);
   const [mineIds, setMineIds] = useState<Set<number>>(new Set());
   const [wishIds, setWishIds] = useState<Set<number>>(new Set());
@@ -74,18 +72,26 @@ export default function StudentCatalog() {
     });
   }, [courses, category, day, q]);
 
-  // 교과군별 그룹핑 — 교과군 이름순 정렬, 교과군 미지정 강좌는 마지막에
-  const grouped = useMemo(() => {
-    const map = new Map<string, Course[]>();
+  // 세션 → 교과군 2단 그룹핑. 두 세션(학기·특강)이 동시에 접수 중이면 세션별 섹션으로 나눠 보여준다.
+  const sessionGroups = useMemo(() => {
+    const bySession = new Map<string, Course[]>();
     for (const c of filtered) {
-      const key = c.group_name || '';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(c);
+      if (!bySession.has(c.semester)) bySession.set(c.semester, []);
+      bySession.get(c.semester)!.push(c);
     }
-    return [...map.entries()].sort(([a], [b]) => {
-      if (!a) return 1; // 미지정은 뒤로
-      if (!b) return -1;
-      return a.localeCompare(b, 'ko');
+    return [...bySession.entries()].map(([code, list]) => {
+      const map = new Map<string, Course[]>();
+      for (const c of list) {
+        const key = c.group_name || '';
+        if (!map.has(key)) map.set(key, []);
+        map.get(key)!.push(c);
+      }
+      const groups = [...map.entries()].sort(([a], [b]) => {
+        if (!a) return 1; // 미지정은 뒤로
+        if (!b) return -1;
+        return a.localeCompare(b, 'ko');
+      });
+      return { code, accepting: list.some((c) => c.accepting), groups };
     });
   }, [filtered]);
 
@@ -133,21 +139,21 @@ export default function StudentCatalog() {
         {user?.grade ? ` (${user.grade}학년 신청 가능 강좌만 표시)` : ''}
       </p>
 
-      {locked && (
+      {courses.length > 0 && courses.every((c) => !c.accepting) && (
         <div className="mb-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
           🔒 수강신청이 마감되었습니다. 신청·취소 등 변경이 불가능합니다. 변경이 필요하면 방과후학교 담당 선생님께 문의하세요.
         </div>
       )}
 
       {/* 희망 강좌 빈자리 알림 — 최우선 표시 */}
-      {!locked && courses.some((c) => wishIds.has(c.id) && !c.is_full && c.status === 'open') && (
+      {courses.some((c) => wishIds.has(c.id) && !c.is_full && c.status === 'open' && c.accepting) && (
         <div className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           🔔 <b>빈자리 희망을 등록한 강좌에 자리가 생겼습니다!</b> 아래에서 노란 테두리 강좌를 바로 신청하세요. (선착순)
         </div>
       )}
 
       {/* 신청 완료 후 로그아웃 유도 — 공용 PC에서 다음 학생을 위해 */}
-      {!locked && mineIds.size > 0 && (
+      {mineIds.size > 0 && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <span>
             ✅ 현재 <b>{mineIds.size}과목</b> 신청 완료 — 신청을 모두 마쳤다면 <b>로그아웃</b>해 주세요. (공용 컴퓨터 보안)
@@ -177,8 +183,20 @@ export default function StudentCatalog() {
       {filtered.length === 0 ? (
         <EmptyState message="조건에 맞는 강좌가 없습니다." />
       ) : (
-        <div className="space-y-8">
-          {grouped.map(([groupName, groupCourses]) => (
+        <div className="space-y-10">
+          {sessionGroups.map((sg) => (
+            <div key={sg.code}>
+              {/* 두 세션 이상 동시 표시 중일 때만 세션 헤더 표시 */}
+              {sessionGroups.length > 1 && (
+                <div className="mb-4 flex items-center gap-2 border-b-2 border-slate-300 pb-2">
+                  <h2 className="text-lg font-bold text-slate-900">{sessionLabel(sg.code)}</h2>
+                  <span className={`badge ${sg.accepting ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
+                    {sg.accepting ? '접수중' : '접수마감'}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-8">
+          {sg.groups.map(([groupName, groupCourses]) => (
             <section key={groupName || '__none__'}>
               <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-800">
                 <span className="inline-block h-4 w-1 rounded-full bg-brand-500" />
@@ -189,8 +207,9 @@ export default function StudentCatalog() {
                 {groupCourses.map((c) => {
             const isMine = mineIds.has(c.id);
             const closed = c.status !== 'open';
+            const cLocked = !c.accepting; // 강좌 소속 세션의 접수 여부
             const wished = wishIds.has(c.id);
-            const seatOpened = wished && !c.is_full && !closed; // 희망 강좌에 빈자리 발생
+            const seatOpened = wished && !c.is_full && !closed && !cLocked; // 희망 강좌에 빈자리 발생
             return (
               <div key={c.id} className={`card flex flex-col p-5 ${seatOpened ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="mb-2 flex items-center justify-between">
@@ -220,10 +239,10 @@ export default function StudentCatalog() {
                 <div className="flex gap-2">
                   <button className="btn-secondary btn-sm flex-1" onClick={() => openDetail(c)}>상세보기</button>
                   {isMine ? (
-                    <button className="btn-danger btn-sm flex-1" onClick={() => cancel(c)} disabled={busy === c.id || locked}>
-                      {locked ? '마감' : '취소'}
+                    <button className="btn-danger btn-sm flex-1" onClick={() => cancel(c)} disabled={busy === c.id || cLocked}>
+                      {cLocked ? '마감' : '취소'}
                     </button>
-                  ) : c.is_full && !closed && !locked ? (
+                  ) : c.is_full && !closed && !cLocked ? (
                     // 정원 마감 → 빈자리 희망 등록/취소 (자동 배정 없음, 여석 발생 시 이 화면에 표시)
                     wished ? (
                       <button
@@ -243,8 +262,8 @@ export default function StudentCatalog() {
                       </button>
                     )
                   ) : (
-                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed || locked}>
-                      {locked ? '마감' : closed ? courseStatusLabel(c.status) : '신청'}
+                    <button className="btn-primary btn-sm flex-1" onClick={() => enroll(c)} disabled={busy === c.id || closed || cLocked}>
+                      {cLocked ? '마감' : closed ? courseStatusLabel(c.status) : '신청'}
                     </button>
                   )}
                 </div>
@@ -253,6 +272,9 @@ export default function StudentCatalog() {
           })}
               </div>
             </section>
+          ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -301,12 +323,12 @@ export default function StudentCatalog() {
 
             <div className="flex justify-end gap-2">
               {mineIds.has(detail.id) ? (
-                <button className="btn-danger" onClick={() => cancel(detail)} disabled={busy === detail.id || locked}>
-                  {locked ? '마감 (변경 불가)' : '수강 취소'}
+                <button className="btn-danger" onClick={() => cancel(detail)} disabled={busy === detail.id || !detail.accepting}>
+                  {!detail.accepting ? '마감 (변경 불가)' : '수강 취소'}
                 </button>
               ) : (
-                <button className="btn-primary" onClick={() => enroll(detail)} disabled={busy === detail.id || detail.status !== 'open' || detail.is_full || locked}>
-                  {locked ? '마감 (변경 불가)' : detail.is_full ? '정원 마감' : '수강 신청'}
+                <button className="btn-primary" onClick={() => enroll(detail)} disabled={busy === detail.id || detail.status !== 'open' || detail.is_full || !detail.accepting}>
+                  {!detail.accepting ? '마감 (변경 불가)' : detail.is_full ? '정원 마감' : '수강 신청'}
                 </button>
               )}
             </div>
