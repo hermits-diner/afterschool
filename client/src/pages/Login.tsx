@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api, Role, ApiError } from '../lib/api';
-import { GraduationCap, Backpack, Presentation, ShieldCheck } from 'lucide-react';
+import { GraduationCap, Backpack, Presentation, ShieldCheck, Megaphone, AlertCircle } from 'lucide-react';
 
 // 랜딩 공지 — 비로그인 공개 정보 (신청기간·접수상태·관리자 공지문)
 interface Landing {
@@ -78,29 +78,30 @@ export default function Login() {
           </p>
 
           {/* 교과 학습 사진 콜라주 — 폴라로이드풍, 서로 다른 기울기·타이밍으로 부유 */}
-          <div className="anim-fade-up anim-delay-3 mt-12 flex items-end gap-4">
+          {/* 유동 그리드 — 패널 폭에 맞춰 4장이 함께 줄어들어 창을 좁혀도 잘리지 않음 */}
+          <div className="anim-fade-up anim-delay-3 mt-12 grid grid-cols-4 items-end gap-4">
             <img
               src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=600&q=75"
               alt="국어·독서"
-              className="animate-float h-56 w-44 -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float aspect-[4/5] w-full -rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
             />
             <img
-              src="https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=600&q=75"
-              alt="수학"
-              className="animate-float h-64 w-52 rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-1.2s' }}
+              src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=600&q=75"
+              alt="수학 문제 풀이"
+              className="animate-float aspect-[4/5] w-full rotate-2 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-1.2s', marginBottom: '1.25rem' }}
             />
             <img
               src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=600&q=75"
               alt="영어·학습"
-              className="animate-float h-56 w-44 rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              className="animate-float aspect-[4/5] w-full rotate-6 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
               style={{ animationDelay: '-2.4s' }}
             />
             <img
               src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&q=75"
               alt="과학 실험"
-              className="animate-float h-64 w-52 -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
-              style={{ animationDelay: '-3.6s' }}
+              className="animate-float aspect-[4/5] w-full -rotate-3 rounded-2xl object-cover shadow-2xl ring-1 ring-white/30"
+              style={{ animationDelay: '-3.6s', marginBottom: '1.25rem' }}
             />
           </div>
         </div>
@@ -136,13 +137,16 @@ export default function Login() {
           {landing && (landing.registration_start || landing.registration_end || landing.notice) && (
             <div className="card anim-fade-up mb-4 p-5">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-bold text-slate-800">📢 {landing.semester.name} 수강신청 안내</h3>
+                <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                  <Megaphone size={15} className="text-brand-500" />
+                  {landing.semester.name} 수강신청 안내
+                </h3>
                 <span className={`badge shrink-0 ${landing.registration_open ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-600'}`}>
                   {landing.registration_open ? '접수중' : '접수마감'}
                 </span>
               </div>
               {(landing.registration_start || landing.registration_end) && (
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-slate-600 [font-variant-numeric:tabular-nums]">
                   신청 기간: <b className="text-slate-800">{fmtDT(landing.registration_start) || '-'} ~ {fmtDT(landing.registration_end) || '-'}</b>
                 </p>
               )}
@@ -166,7 +170,7 @@ export default function Login() {
                     setRole(r.key);
                     setError('');
                   }}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-2 py-4 text-center transition-all duration-200 ${
+                  className={`flex flex-col items-center gap-2 rounded-xl border-2 px-2 py-4 text-center transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 focus-visible:ring-offset-2 active:scale-[.98] ${
                     role === r.key
                       ? 'border-brand-500 bg-brand-50 shadow-lift'
                       : 'border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-card'
@@ -206,10 +210,14 @@ export default function Login() {
               </div>
 
               {error && (
-                <div className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700">{error}</div>
+                <div role="alert" className="flex items-start gap-2 rounded-lg bg-rose-50 px-3 py-2.5 text-sm text-rose-700 ring-1 ring-rose-100">
+                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                  {error}
+                </div>
               )}
 
               <button type="submit" className="btn-primary w-full py-3 text-base" disabled={loading}>
+                {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />}
                 {loading ? '로그인 중...' : '로그인'}
               </button>
             </form>
