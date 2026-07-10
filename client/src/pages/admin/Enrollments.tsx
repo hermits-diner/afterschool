@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
 import { TableSkeleton, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { enrollStatusLabel, studentLabel } from '../../lib/format';
+import { courseDisplayTitle, enrollStatusLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 
 interface Row {
@@ -16,7 +16,11 @@ interface Row {
   course_title: string;
   category: string;
   course_id: number;
+  group_name?: string | null;
 }
+
+// 교과군 포함 강좌 표시명 (예: [A유형] 문학의 밤)
+const rowTitle = (r: Row) => courseDisplayTitle({ title: r.course_title, group_name: r.group_name });
 
 export default function AdminEnrollments() {
   const toast = useToast();
@@ -40,7 +44,7 @@ export default function AdminEnrollments() {
         const s = q.toLowerCase();
         return (
           r.student_name.toLowerCase().includes(s) ||
-          r.course_title.toLowerCase().includes(s)
+          rowTitle(r).toLowerCase().includes(s)
         );
       }
       return true;
@@ -48,7 +52,7 @@ export default function AdminEnrollments() {
   }, [rows, q, status]);
 
   async function cancel(r: Row) {
-    if (!confirm(`${r.student_name} 학생의 '${r.course_title}' 신청을 취소하시겠습니까?`)) return;
+    if (!confirm(`${r.student_name} 학생의 '${rowTitle(r)}' 신청을 취소하시겠습니까?`)) return;
     await api.del(`/admin/enrollments/${r.id}`);
     toast('신청이 취소되었습니다.', 'success');
     load();
@@ -57,7 +61,7 @@ export default function AdminEnrollments() {
   function exportCsv() {
     const header = ['학생', '학년', '반', '번호', '강좌', '교과', '상태', '신청일시'];
     const lines = filtered.map((r) =>
-      [r.student_name, r.grade, r.class_no, r.student_no, r.course_title, r.category, enrollStatusLabel(r.status), r.created_at].join(',')
+      [r.student_name, r.grade, r.class_no, r.student_no, rowTitle(r), r.category, enrollStatusLabel(r.status), r.created_at].join(',')
     );
     const csv = '﻿' + [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -121,7 +125,7 @@ export default function AdminEnrollments() {
                     <td className="td">
                       <div className="flex items-center gap-2">
                         <CategoryBadge category={r.category} />
-                        {r.course_title}
+                        {rowTitle(r)}
                       </div>
                     </td>
                     <td className="td"><EnrollBadge status={r.status} /></td>

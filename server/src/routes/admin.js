@@ -952,8 +952,9 @@ router.get('/enrollments', ah(async (req, res) => {
   const semester = (await getSettings()).semester;
   const rows = await all(
     `SELECT e.id, e.status, e.created_at, u.name AS student_name, u.grade, u.class_no, u.student_no,
-            c.title AS course_title, c.category, c.id AS course_id
+            c.title AS course_title, c.category, c.id AS course_id, g.name AS group_name
      FROM enrollments e JOIN users u ON u.id=e.student_id JOIN courses c ON c.id=e.course_id
+     LEFT JOIN course_groups g ON g.id = c.group_id
      WHERE c.semester = ? AND e.status != 'cancelled'
      ORDER BY e.created_at DESC`,
     [semester]

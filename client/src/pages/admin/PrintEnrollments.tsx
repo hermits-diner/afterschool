@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
-import { targetGradesLabel, enrollStatusLabel, courseStatusLabel, studentLabel } from '../../lib/format';
+import { courseDisplayTitle, targetGradesLabel, enrollStatusLabel, courseStatusLabel, studentLabel } from '../../lib/format';
 
 interface Row {
   id: number;
@@ -13,6 +13,7 @@ interface Row {
   student_no: number;
   course_title: string;
   category: string;
+  group_name?: string | null;
 }
 
 // Printable admin report: per-course summary + full enrollment list.
@@ -59,7 +60,7 @@ export default function PrintEnrollments() {
           {courses.map((c, i) => (
             <tr key={c.id}>
               <Td center>{i + 1}</Td>
-              <Td>{c.title}</Td>
+              <Td>{courseDisplayTitle(c)}</Td>
               <Td center>{c.category}</Td>
               <Td center>{c.teacher_name}</Td>
               <Td center>{c.schedule_label}</Td>
@@ -91,7 +92,7 @@ export default function PrintEnrollments() {
               <Td center>{i + 1}</Td>
               <Td center>{r.student_name}</Td>
               <Td center>{studentLabel(r.grade, r.class_no, r.student_no)}</Td>
-              <Td>{r.course_title}</Td>
+              <Td>{courseDisplayTitle({ title: r.course_title, group_name: r.group_name })}</Td>
               <Td center>{enrollStatusLabel(r.status)}</Td>
               <Td center>{r.created_at}</Td>
             </tr>
