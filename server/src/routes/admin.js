@@ -364,6 +364,76 @@ router.post('/semesters', ah(async (req, res) => {
   res.status(201).json({ semester: row });
 }));
 
+// 세션 복사 — 원본 세션의 정책값에 더해 교과군(선택)과 강좌(선택, 신청 내역 제외)를
+// 새 세션으로 복제한다. 코드·신청기간 등은 요청값을 사용한다.
+router.post('/semesters/:code/clone', ah(async (req, res) => {
+  const src = await get('SELECT * FROM semesters WHERE code = ?', [req.params.code]);
+  if (!src) return res.status(404).json({ error: '원본 세션을 찾을 수 없습니다.' });
+  const schema = semesterSchema.extend({
+    copy_groups: z.boolean().optional().default(true),
+    copy_courses: z.boolean().optional().default(false),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const d = parsed.data;
+  const dupe = await get('SELECT code FROM semesters WHERE code = ?', [d.code]);
+  if (dupe) return res.status(409).json({ error: '이미 존재하는 세션 코드입니다.' });
+
+  await run(
+    `INSERT INTO semesters (code, name, registration_open, registration_start, registration_end, max_courses_per_student, default_sessions)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      d.code,
+      d.name || semesterName(d.code),
+      String(d.registration_open ?? 'true') === 'true' ? 'true' : 'false',
+      d.registration_start || null,
+      d.registration_end || null,
+      Number(d.max_courses_per_student ?? src.max_courses_per_student ?? 3),
+      Number(d.default_sessions ?? src.default_sessions ?? 16),
+    ]
+  );
+
+  // 교과군 복사 — 새 세션 소속으로 복제하고 old→new id 매핑을 만든다 (강좌 연결용)
+  const groupMap = {};
+  let copiedGroups = 0;
+  if (d.copy_groups || d.copy_courses) {
+    const groups = await all('SELECT * FROM course_groups WHERE semester = ?', [src.code]);
+    for (const g of groups) {
+      const info = await run('INSERT INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', [
+        g.name,
+        d.code,
+        g.schedule,
+      ]);
+      groupMap[g.id] = info.lastInsertRowid;
+      copiedGroups++;
+    }
+  }
+
+  // 강좌 복사 — 신청·출석 내역 없이 강좌 정보만. 상태는 '모집중', 수동 회차는 초기화.
+  let copiedCourses = 0;
+  if (d.copy_courses) {
+    const courses = await all("SELECT * FROM courses WHERE semester = ? AND status != 'cancelled'", [src.code]);
+    for (const c of courses) {
+      await run(
+        `INSERT INTO courses (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time,
+           room, textbook, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, semester, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
+        [
+          c.title, c.category, c.description ?? '', c.teacher_id ?? null, c.capacity,
+          c.day_of_week, c.start_time, c.end_time, c.room ?? '', c.textbook ?? '',
+          c.target_grade ?? 0, c.target_grades ?? '', c.fee ?? 0, c.pay_rate ?? 0,
+          c.planned_sessions ?? 0, c.schedule ?? null,
+          c.group_id ? groupMap[c.group_id] ?? null : null, d.code,
+        ]
+      );
+      copiedCourses++;
+    }
+  }
+
+  const row = await get('SELECT * FROM semesters WHERE code = ?', [d.code]);
+  res.status(201).json({ semester: row, copied: { groups: copiedGroups, courses: copiedCourses } });
+}));
+
 // Update a semester's settings.
 router.put('/semesters/:code', ah(async (req, res) => {
   const existing = await get('SELECT * FROM semesters WHERE code = ?', [req.params.code]);
@@ -394,6 +464,42 @@ router.put('/semesters/:code', ah(async (req, res) => {
     [merged.name, merged.registration_open, merged.registration_start, merged.registration_end, merged.max_courses_per_student, merged.default_sessions, existing.code]
   );
   res.json({ semester: await get('SELECT * FROM semesters WHERE code = ?', [existing.code]) });
+}));
+
+// 세션 코드 변경 — 코드는 강좌·교과군·정산 데이터를 잇는 연결 키이므로
+// 참조하는 모든 데이터를 한 트랜잭션으로 함께 이관한다. (활성 세션 포인터 포함)
+router.post('/semesters/:code/rename', ah(async (req, res) => {
+  const src = await get('SELECT * FROM semesters WHERE code = ?', [req.params.code]);
+  if (!src) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+  const schema = z.object({
+    code: z.string().regex(/^\d{4}-([12]|여름|겨울|특강\d?)$/, "세션 코드는 '2026-1'(학기), '2026-여름'(방학), '2026-특강'(특강, 번호 가능) 형식이어야 합니다."),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
+  const newCode = parsed.data.code;
+  if (newCode === src.code) return res.json({ ok: true, code: newCode });
+  const dupe = await get('SELECT code FROM semesters WHERE code = ?', [newCode]);
+  if (dupe) return res.status(409).json({ error: '이미 존재하는 세션 코드입니다.' });
+  await batch([
+    { sql: 'UPDATE semesters SET code = ? WHERE code = ?', args: [newCode, src.code] },
+    { sql: 'UPDATE courses SET semester = ? WHERE semester = ?', args: [newCode, src.code] },
+    { sql: 'UPDATE course_groups SET semester = ? WHERE semester = ?', args: [newCode, src.code] },
+    // 휴지통 스냅샷: 컬럼과 JSON 내부의 세션 코드 모두 이관 (복원 시 새 코드로 붙도록)
+    {
+      sql: "UPDATE courses_trash SET data = json_set(data, '$.course.semester', ?), semester = ? WHERE semester = ?",
+      args: [newCode, newCode, src.code],
+    },
+    // 활성 세션 포인터 갱신
+    { sql: "UPDATE settings SET value = ? WHERE key = 'semester' AND value = ?", args: [newCode, src.code] },
+    // 세션별 정산 계산기 입력값 키 이관
+    { sql: 'DELETE FROM settings WHERE key = ?', args: [`finance_calc:${newCode}`] },
+    { sql: 'UPDATE settings SET key = ? WHERE key = ?', args: [`finance_calc:${newCode}`, `finance_calc:${src.code}`] },
+  ]);
+  // 자동 생성 형식의 이름이었다면 새 코드 기준으로 함께 갱신
+  if (src.name === semesterName(src.code)) {
+    await run('UPDATE semesters SET name = ? WHERE code = ?', [semesterName(newCode), newCode]);
+  }
+  res.json({ ok: true, code: newCode });
 }));
 
 // Switch the active session — new courses/신청 화면이 이 세션 기준으로 동작.

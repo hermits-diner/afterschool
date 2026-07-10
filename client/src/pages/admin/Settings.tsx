@@ -42,6 +42,7 @@ export default function AdminSettings() {
   const [semesters, setSemesters] = useState<Semester[] | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Semester | null>(null);
+  const [cloning, setCloning] = useState<Semester | null>(null); // 복사 원본 세션
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<CourseGroup[]>([]);
@@ -109,11 +110,26 @@ export default function AdminSettings() {
 
   function openCreate() {
     setEditing(null);
+    setCloning(null);
     setForm(emptyForm);
+    setModalOpen(true);
+  }
+  // 세션 복사 — 정책값은 원본에서 미리 채우고, 코드·신청기간만 새로 입력.
+  function openClone(s: Semester) {
+    setEditing(null);
+    setCloning(s);
+    setForm({
+      ...emptyForm,
+      max_courses_per_student: s.max_courses_per_student,
+      default_sessions: s.default_sessions ?? 16,
+      copy_groups: true,
+      copy_courses: false,
+    });
     setModalOpen(true);
   }
   function openEdit(s: Semester) {
     setEditing(s);
+    setCloning(null);
     setForm({
       code: s.code,
       name: s.name,
@@ -144,8 +160,28 @@ export default function AdminSettings() {
         registration_open: form.registration_open,
       };
       if (editing) {
-        await api.put(`/admin/semesters/${editing.code}`, payload);
-        toast('세션 설정이 저장되었습니다.', 'success');
+        // 코드가 바뀌었으면 먼저 이관(rename) — 강좌·교과군·정산 데이터가 함께 새 코드로 이동
+        const codeChanged = form.code && form.code !== editing.code;
+        if (codeChanged) {
+          await api.post(`/admin/semesters/${encodeURIComponent(editing.code)}/rename`, { code: form.code });
+        }
+        const { code, ...rest } = payload;
+        await api.put(`/admin/semesters/${encodeURIComponent(form.code || editing.code)}`, rest);
+        toast(codeChanged ? `세션 코드가 ${form.code}(으)로 변경되고 연결 데이터가 이관되었습니다.` : '세션 설정이 저장되었습니다.', 'success');
+        if (codeChanged && editing.is_active) {
+          // 활성 세션 코드 변경 → 헤더 라벨 등 전체 갱신
+          window.location.reload();
+          return;
+        }
+      } else if (cloning) {
+        const r = await api.post<{ copied: { groups: number; courses: number } }>(
+          `/admin/semesters/${cloning.code}/clone`,
+          { ...payload, copy_groups: !!form.copy_groups, copy_courses: !!form.copy_courses }
+        );
+        toast(
+          `세션이 복사되었습니다. (교과군 ${r.copied.groups}개${form.copy_courses ? ` · 강좌 ${r.copied.courses}개` : ''} 복사)`,
+          'success'
+        );
       } else {
         await api.post('/admin/semesters', payload);
         toast('새 세션이 생성되었습니다.', 'success');
@@ -259,6 +295,7 @@ export default function AdminSettings() {
                   {!s.is_active && (
                     <button className="btn-secondary btn-sm" onClick={() => activate(s)}>활성화</button>
                   )}
+                  <button className="btn-ghost btn-sm" onClick={() => openClone(s)} title="이 세션의 설정·교과군(·강좌)을 복사해 새 세션을 만듭니다">복사</button>
                   <button className="btn-ghost btn-sm" onClick={() => openEdit(s)}>설정</button>
                   {!s.is_active && (
                     <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(s)}>삭제</button>
@@ -380,7 +417,11 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `세션 설정 · ${editing.name}` : '새 세션 만들기'}>
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? `세션 설정 · ${editing.name}` : cloning ? `세션 복사 · ${cloning.name}` : '새 세션 만들기'}
+      >
         <form onSubmit={save} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -390,9 +431,13 @@ export default function AdminSettings() {
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="예: 2026-2 · 2026-여름 · 2026-특강"
-                disabled={!!editing}
                 required
               />
+              {editing && form.code !== editing.code && (
+                <p className="mt-1 text-xs text-amber-600">
+                  ⚠️ 코드를 변경하면 이 세션의 강좌·교과군·정산 데이터가 새 코드로 함께 이관됩니다.
+                </p>
+              )}
             </div>
             <div>
               <label className="label">세션 이름</label>
@@ -435,9 +480,39 @@ export default function AdminSettings() {
               </label>
             </div>
           </div>
+          {/* 복사 모드 — 무엇을 함께 복사할지 선택 */}
+          {cloning && (
+            <div className="space-y-2 rounded-xl bg-slate-50 px-4 py-3">
+              <p className="text-sm font-semibold text-slate-700">'{cloning.name}'에서 함께 복사할 항목</p>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand-600"
+                  checked={!!form.copy_groups}
+                  onChange={(e) => setForm({ ...form, copy_groups: e.target.checked })}
+                />
+                교과군 (교시 블록) — {cloning.name}의 교과군을 새 세션에 그대로 복제
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-brand-600"
+                  checked={!!form.copy_courses}
+                  onChange={(e) => setForm({ ...form, copy_courses: e.target.checked })}
+                />
+                강좌 — 강좌 정보만 복사 (신청·출석 내역 제외, 전부 '모집중' 상태로 시작)
+              </label>
+              {form.copy_courses && !form.copy_groups && (
+                <p className="text-xs text-amber-600">💡 강좌를 복사하면 연결에 필요한 교과군도 함께 복사됩니다.</p>
+              )}
+              <p className="text-xs text-slate-400">복사 후 강좌 관리에서 강사·정원 등 일부 내용만 수정하면 됩니다.</p>
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>취소</button>
-            <button className="btn-primary" disabled={saving}>{saving ? '저장 중...' : editing ? '저장' : '세션 생성'}</button>
+            <button className="btn-primary" disabled={saving}>
+              {saving ? '저장 중...' : editing ? '저장' : cloning ? '복사해서 생성' : '세션 생성'}
+            </button>
           </div>
         </form>
       </Modal>
