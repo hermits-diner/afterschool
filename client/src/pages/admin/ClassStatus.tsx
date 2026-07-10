@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { courseDisplayTitle } from '../../lib/format';
+import { courseTeacherLabel } from '../../lib/format';
 
 export interface ClassStudent {
   id: number;
@@ -16,11 +16,6 @@ export interface ClassStudent {
     teacher_name?: string;
     group_name?: string | null;
   }[];
-}
-
-// '[교과군] 강좌명 · 강사' 표기 — 다른 화면과 동일한 courseDisplayTitle 규칙
-export function enrollmentLabel(e: ClassStudent['enrollments'][number]) {
-  return [courseDisplayTitle(e), e.teacher_name].filter(Boolean).join(' · ');
 }
 
 export interface ClassInfo {
@@ -133,7 +128,7 @@ export default function AdminClassStatus() {
                             <div className="flex flex-wrap gap-1">
                               {s.enrollments.map((e, i) => (
                                 <span key={i} className="badge bg-emerald-100 text-emerald-700">
-                                  {enrollmentLabel(e)}
+                                  {courseTeacherLabel(e)}
                                 </span>
                               ))}
                             </div>

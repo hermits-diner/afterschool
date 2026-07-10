@@ -4,8 +4,9 @@ import { TableSkeleton, EmptyState, CategoryBadge, EnrollBadge } from '../../com
 import { Icons } from '../../components/icons';
 import { courseDisplayTitle, enrollStatusLabel, studentLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
+import { downloadCsv } from '../../lib/csv';
 
-interface Row {
+export interface EnrollmentRow {
   id: number;
   status: string;
   created_at: string;
@@ -20,16 +21,16 @@ interface Row {
 }
 
 // 교과군 포함 강좌 표시명 (예: [A유형] 문학의 밤)
-const rowTitle = (r: Row) => courseDisplayTitle({ title: r.course_title, group_name: r.group_name });
+export const rowTitle = (r: EnrollmentRow) => courseDisplayTitle({ title: r.course_title, group_name: r.group_name });
 
 export default function AdminEnrollments() {
   const toast = useToast();
-  const [rows, setRows] = useState<Row[] | null>(null);
+  const [rows, setRows] = useState<EnrollmentRow[] | null>(null);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
 
   async function load() {
-    const r = await api.get<{ enrollments: Row[] }>('/admin/enrollments');
+    const r = await api.get<{ enrollments: EnrollmentRow[] }>('/admin/enrollments');
     setRows(r.enrollments);
   }
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function AdminEnrollments() {
     });
   }, [rows, q, status]);
 
-  async function cancel(r: Row) {
+  async function cancel(r: EnrollmentRow) {
     if (!confirm(`${r.student_name} 학생의 '${rowTitle(r)}' 신청을 취소하시겠습니까?`)) return;
     await api.del(`/admin/enrollments/${r.id}`);
     toast('신청이 취소되었습니다.', 'success');
@@ -59,18 +60,11 @@ export default function AdminEnrollments() {
   }
 
   function exportCsv() {
-    const header = ['학생', '학년', '반', '번호', '강좌', '교과', '상태', '신청일시'];
-    const lines = filtered.map((r) =>
-      [r.student_name, r.grade, r.class_no, r.student_no, rowTitle(r), r.category, enrollStatusLabel(r.status), r.created_at].join(',')
+    downloadCsv(
+      `수강신청현황_${new Date().toISOString().slice(0, 10)}.csv`,
+      ['학생', '학년', '반', '번호', '강좌', '교과', '상태', '신청일시'],
+      filtered.map((r) => [r.student_name, r.grade, r.class_no, r.student_no, rowTitle(r), r.category, enrollStatusLabel(r.status), r.created_at])
     );
-    const csv = '﻿' + [header.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `수강신청현황_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   if (!rows) return <TableSkeleton />;

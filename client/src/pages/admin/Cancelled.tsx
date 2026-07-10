@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
-import { courseDisplayTitle, studentLabel } from '../../lib/format';
+import { courseTeacherLabel, studentLabel } from '../../lib/format';
 
 export interface CancelledStudent {
   student_id: number;
@@ -16,11 +16,6 @@ export interface CancelledStudent {
     teacher_name: string;
     group_name: string | null;
   }[];
-}
-
-// '[교과군] 강좌명 · 강사' 표기 (반별 현황과 동일한 courseDisplayTitle 규칙)
-export function cancelledCourseLabel(c: CancelledStudent['courses'][number]) {
-  return [courseDisplayTitle(c), c.teacher_name].filter(Boolean).join(' · ');
 }
 
 // 폐강 강좌를 신청했던 학생 — 추가 신청 안내 대상. 전체/반별 목록 + 인쇄.
@@ -104,7 +99,7 @@ export default function AdminCancelled() {
                         <div className="flex flex-wrap gap-1">
                           {s.courses.map((c, i) => (
                             <span key={i} className="badge bg-rose-100 text-rose-700">
-                              {cancelledCourseLabel(c)}
+                              {courseTeacherLabel(c)}
                             </span>
                           ))}
                         </div>

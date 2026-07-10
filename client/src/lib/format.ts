@@ -67,6 +67,11 @@ export function courseDisplayTitle(c: { title: string; group_name?: string | nul
   return `[${c.group_name}] ${c.title}`;
 }
 
+// '[교과군] 강좌명 · 강사' 표기 — 반별 현황·폐강 재신청 등 배지/명단용
+export function courseTeacherLabel(c: { title: string; group_name?: string | null; teacher_name?: string | null }) {
+  return [courseDisplayTitle(c), c.teacher_name].filter(Boolean).join(' · ');
+}
+
 export function formatFee(fee: number) {
   return fee === 0 ? '무료' : `${fee.toLocaleString()}원`;
 }

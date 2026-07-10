@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
-import { studentLabel } from '../../lib/format';
-import { cancelledCourseLabel } from './Cancelled';
+import { courseTeacherLabel, studentLabel } from '../../lib/format';
 import type { CancelledStudent } from './Cancelled';
 
 // 폐강 재신청 대상 인쇄 — grade/classNo가 'all'이면 전체를 반 순서로 한 번에 출력.
@@ -37,7 +36,7 @@ export default function PrintCancelled() {
               <Th w="6%">번호</Th>
               <Th w="14%">학번</Th>
               <Th w="12%">이름</Th>
-              <Th>폐강된 신청 강좌 (강좌명 · 교과군 · 강사)</Th>
+              <Th>폐강된 신청 강좌 ([교과군] 강좌명 · 강사)</Th>
               <Th w="16%">재신청 확인</Th>
             </tr>
           </thead>
@@ -48,7 +47,7 @@ export default function PrintCancelled() {
                 <Td center>{studentLabel(s.grade, s.class_no, s.student_no)}</Td>
                 <Td center>{s.name}</Td>
                 <Td>
-                  {s.courses.map((c) => cancelledCourseLabel(c)).join(', ')}
+                  {s.courses.map((c) => courseTeacherLabel(c)).join(', ')}
                 </Td>
                 <Td> </Td>
               </tr>

@@ -2,29 +2,18 @@ import { useEffect, useState } from 'react';
 import { api, Course } from '../../lib/api';
 import { PrintShell, PrintMeta, PrintLoading, Th, Td } from '../../components/print';
 import { courseDisplayTitle, targetGradesLabel, enrollStatusLabel, courseStatusLabel, studentLabel } from '../../lib/format';
-
-interface Row {
-  id: number;
-  status: string;
-  created_at: string;
-  student_name: string;
-  grade: number;
-  class_no: number;
-  student_no: number;
-  course_title: string;
-  category: string;
-  group_name?: string | null;
-}
+import { rowTitle } from './Enrollments';
+import type { EnrollmentRow } from './Enrollments';
 
 // Printable admin report: per-course summary + full enrollment list.
 export default function PrintEnrollments() {
   const [courses, setCourses] = useState<Course[] | null>(null);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<EnrollmentRow[]>([]);
 
   useEffect(() => {
     Promise.all([
       api.get<{ courses: Course[] }>('/courses'),
-      api.get<{ enrollments: Row[] }>('/admin/enrollments'),
+      api.get<{ enrollments: EnrollmentRow[] }>('/admin/enrollments'),
     ]).then(([c, e]) => {
       setCourses(c.courses);
       setRows(e.enrollments);
@@ -92,7 +81,7 @@ export default function PrintEnrollments() {
               <Td center>{i + 1}</Td>
               <Td center>{r.student_name}</Td>
               <Td center>{studentLabel(r.grade, r.class_no, r.student_no)}</Td>
-              <Td>{courseDisplayTitle({ title: r.course_title, group_name: r.group_name })}</Td>
+              <Td>{rowTitle(r)}</Td>
               <Td center>{enrollStatusLabel(r.status)}</Td>
               <Td center>{r.created_at}</Td>
             </tr>

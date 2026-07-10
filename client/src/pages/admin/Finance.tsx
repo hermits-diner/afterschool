@@ -4,6 +4,7 @@ import { Stat, TableSkeleton, EmptyState, CategoryBadge } from '../../components
 import { Icons } from '../../components/icons';
 import { useToast } from '../../context/ToastContext';
 import { courseDisplayTitle } from '../../lib/format';
+import { downloadCsv } from '../../lib/csv';
 
 export interface FinanceRow {
   id: number;
@@ -120,18 +121,11 @@ export default function AdminFinance() {
 
   function exportCsv() {
     if (!data) return;
-    const header = ['강좌', '교과', '강사', '수강인원', '수강료단가', '수강료수입', '회당강사료', '실시회차', '강사료'];
-    const lines = data.courses.map((r) =>
-      [courseDisplayTitle(r), r.category, r.teacher_name, r.enrolled_count, r.fee, r.revenue, r.pay_rate, r.session_count, r.teacher_pay].join(',')
+    downloadCsv(
+      `정산_${data.semester}_${new Date().toISOString().slice(0, 10)}.csv`,
+      ['강좌', '교과', '강사', '수강인원', '수강료단가', '수강료수입', '회당강사료', '실시회차', '강사료'],
+      data.courses.map((r) => [courseDisplayTitle(r), r.category, r.teacher_name, r.enrolled_count, r.fee, r.revenue, r.pay_rate, r.session_count, r.teacher_pay])
     );
-    const csv = '﻿' + [header.join(','), ...lines].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `정산_${data.semester}_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
     toast('CSV가 다운로드되었습니다.', 'success');
   }
 
