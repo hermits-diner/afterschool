@@ -3,7 +3,7 @@ import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseF
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar, TableSkeleton } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
-import { CATEGORIES, targetGradesLabel, studentLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
+import { CATEGORIES, courseDisplayTitle, targetGradesLabel, studentLabel, Slot, scheduleLabel, DESCRIPTION_HINT } from '../../lib/format';
 import GradePicker from '../../components/GradePicker';
 import { useToast } from '../../context/ToastContext';
 
@@ -307,7 +307,7 @@ export default function AdminCourses() {
   }
 
   async function remove(c: Course) {
-    if (!confirm(`'${c.title}' 강좌를 삭제(휴지통 이동)하시겠습니까?\n잘못 삭제한 경우 휴지통에서 신청 내역까지 그대로 복원할 수 있습니다.`)) return;
+    if (!confirm(`'${courseDisplayTitle(c)}' 강좌를 삭제(휴지통 이동)하시겠습니까?\n잘못 삭제한 경우 휴지통에서 신청 내역까지 그대로 복원할 수 있습니다.`)) return;
     await api.del(`/courses/${c.id}`);
     toast('강좌를 휴지통으로 이동했습니다.', 'success');
     load();
@@ -375,7 +375,6 @@ export default function AdminCourses() {
                     <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
                   </th>
                   <th className="th">학년</th>
-                  <th className="th">교과군</th>
                   <th className="th">강좌명</th>
                   <th className="th">강사</th>
                   <th className="th">시간</th>
@@ -396,17 +395,10 @@ export default function AdminCourses() {
                       />
                     </td>
                     <td className="td whitespace-nowrap">{targetGradesLabel(c.target_grades)}</td>
-                    <td className="td whitespace-nowrap">
-                      {c.group_name ? (
-                        <span className="badge bg-brand-50 text-brand-700">{c.group_name}</span>
-                      ) : (
-                        <span className="text-slate-300">-</span>
-                      )}
-                    </td>
                     <td className="td">
                       <div className="flex items-center gap-2">
                         <CategoryBadge category={c.category} />
-                        <span className="font-semibold text-slate-800">{c.title}</span>
+                        <span className="font-semibold text-slate-800">{courseDisplayTitle(c)}</span>
                       </div>
                     </td>
                     <td className="td">{c.teacher_name}</td>
@@ -467,7 +459,7 @@ export default function AdminCourses() {
           <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-600">
             {selectedCourses.map((c) => (
               <div key={c.id} className="py-0.5">
-                {c.title} <span className="text-slate-400">— {c.teacher_name} · 신청 {c.enrolled_count}건</span>
+                {courseDisplayTitle(c)} <span className="text-slate-400">— {c.teacher_name} · 신청 {c.enrolled_count}건</span>
               </div>
             ))}
           </div>
