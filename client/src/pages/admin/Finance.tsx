@@ -147,7 +147,7 @@ export default function AdminFinance() {
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={() => window.open('/admin/print/finance', '_blank')}>
-            <Icons.printer size={16} /> 정산 보고서 인쇄
+            <Icons.printer size={16} /> 강사료 보고서 인쇄
           </button>
           <button className="btn-secondary" onClick={exportCsv}>
             <Icons.download size={16} /> CSV
@@ -293,8 +293,8 @@ export default function AdminFinance() {
         </div>
       )}
 
-      {/* 강좌별 정산 */}
-      <h2 className="mb-3 mt-8 text-base font-bold text-slate-900">강좌별 정산 내역</h2>
+      {/* 강좌별 강사료 */}
+      <h2 className="mb-3 mt-8 text-base font-bold text-slate-900">강좌별 강사료</h2>
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px]">
