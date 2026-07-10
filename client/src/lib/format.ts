@@ -61,6 +61,12 @@ export function targetGradesLabel(grades?: number[] | null) {
   return `${[...grades].sort().join('·')}학년`;
 }
 
+// 강좌 표시명 — 교과목군(예: A유형)이 있으면 반드시 앞에 표기. 제목에 이미 포함돼 있으면 중복 방지.
+export function courseDisplayTitle(c: { title: string; group_name?: string | null }) {
+  if (!c.group_name || c.title.includes(c.group_name)) return c.title;
+  return `[${c.group_name}] ${c.title}`;
+}
+
 export function formatFee(fee: number) {
   return fee === 0 ? '무료' : `${fee.toLocaleString()}원`;
 }

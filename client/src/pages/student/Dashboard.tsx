@@ -4,7 +4,7 @@ import { api, Course } from '../../lib/api';
 import { EmptyState, CategoryBadge, EnrollBadge, PageHeader, StatBand, CardGridSkeleton } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
-import { formatFee } from '../../lib/format';
+import { courseDisplayTitle } from '../../lib/format';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -25,7 +25,7 @@ export default function StudentDashboard() {
   }
 
   const enrolled = mine.filter((c) => c.enrollment_status === 'enrolled');
-  const totalFee = enrolled.reduce((sum, c) => sum + c.fee, 0);
+  const weeklySlots = enrolled.reduce((sum, c) => sum + (c.schedule?.length || 0), 0);
 
   return (
     <div>
@@ -41,13 +41,14 @@ export default function StudentDashboard() {
             label: '수강 확정',
             value: enrolled.length,
             unit: '과목',
-            sub: enrolled.length === 0 ? '아직 확정된 강좌가 없습니다' : `주 ${enrolled.length}회 수업 예정`,
+            sub: enrolled.length === 0 ? '아직 확정된 강좌가 없습니다' : '이번 학기 신청 기준',
             icon: <Icons.book size={18} />,
           },
           {
-            label: '수강료 합계',
-            value: formatFee(totalFee),
-            sub: '확정 강좌 기준',
+            label: '주간 수업',
+            value: weeklySlots,
+            unit: '회',
+            sub: '수강 확정 강좌 기준',
             icon: <Icons.chart size={18} />,
           },
         ]}
@@ -72,7 +73,7 @@ export default function StudentDashboard() {
                     <CategoryBadge category={c.category} />
                     <EnrollBadge status={c.enrollment_status} />
                   </div>
-                  <h3 className="truncate font-semibold text-slate-900">{c.title}</h3>
+                  <h3 className="truncate font-semibold text-slate-900">{courseDisplayTitle(c)}</h3>
                   <p className="text-sm text-slate-500">
                     {c.schedule_label} · {c.room} · {c.teacher_name}
                   </p>

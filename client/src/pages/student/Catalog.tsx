@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, Course, ApiError, downloadCourseFile } from '../../lib/api';
 import { Modal, EmptyState, CategoryBadge, ProgressBar, CardGridSkeleton } from '../../components/ui';
-import { CATEGORIES, DAYS, targetGradesLabel, formatFee, courseStatusLabel, sessionLabel } from '../../lib/format';
+import { CATEGORIES, DAYS, targetGradesLabel, courseStatusLabel, courseDisplayTitle, sessionLabel } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { Icons } from '../../components/icons';
@@ -224,12 +224,11 @@ export default function StudentCatalog() {
                   <CategoryBadge category={c.category} />
                   <span className="text-xs text-slate-400">{targetGradesLabel(c.target_grades)}</span>
                 </div>
-                <h3 className="mb-1 font-bold text-slate-900">{c.title}</h3>
+                <h3 className="mb-1 font-bold text-slate-900">{courseDisplayTitle(c)}</h3>
                 <p className="mb-3 line-clamp-2 flex-1 text-sm text-slate-500">{c.description || '강좌 소개가 없습니다.'}</p>
                 <div className="mb-3 space-y-1.5 text-sm text-slate-600">
                   <div className="flex items-center gap-2"><Icons.clock size={15} className="text-slate-400" /> {c.schedule_label}</div>
                   <div className="flex items-center gap-2"><Icons.pin size={15} className="text-slate-400" /> {c.room || '미정'} · {c.teacher_name}</div>
-                  <div className="flex items-center gap-2"><Icons.wallet size={15} className="text-slate-400" /> {formatFee(c.fee)}</div>
                 </div>
                 <div className="mb-3">
                   <div className="mb-1 flex justify-between text-xs">
@@ -288,7 +287,7 @@ export default function StudentCatalog() {
       )}
 
       {/* Detail modal */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.title || ''}>
+      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail ? courseDisplayTitle(detail) : ''}>
         {detail && (
           <div>
             <div className="mb-4 flex items-center gap-2">
@@ -300,7 +299,6 @@ export default function StudentCatalog() {
               <Row label="담당 강사" value={detail.teacher_name} />
               <Row label="교시" value={detail.schedule_label || ''} />
               <Row label="강의실" value={detail.room || '미정'} />
-              <Row label="수강료" value={formatFee(detail.fee)} />
               <Row label="부교재" value={detail.textbook || '자체제작'} />
               <Row label="정원" value={`${detail.enrolled_count} / ${detail.capacity}명`} />
               <Row label="잔여 좌석" value={detail.is_full ? '정원 마감' : `${detail.seats_left}자리`} />

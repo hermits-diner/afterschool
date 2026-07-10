@@ -3,7 +3,7 @@ import { api, Course } from '../../lib/api';
 import { TableSkeleton, EmptyState, CategoryBadge } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import Timetable from '../../components/Timetable';
-import { DAYS } from '../../lib/format';
+import { courseDisplayTitle, DAYS } from '../../lib/format';
 
 export default function StudentTimetable() {
   const [mine, setMine] = useState<Course[] | null>(null);
@@ -48,7 +48,7 @@ export default function StudentTimetable() {
                     {dayCourses.map(({ c, slot }) => (
                       <div key={c.id} className="flex items-center gap-2 text-sm">
                         <CategoryBadge category={c.category} />
-                        <span className="font-medium text-slate-800">{c.title}</span>
+                        <span className="font-medium text-slate-800">{courseDisplayTitle(c)}</span>
                         <span className="ml-auto text-xs text-slate-400">{slot!.from === slot!.to ? `${slot!.from}교시` : `${slot!.from}~${slot!.to}교시`}</span>
                       </div>
                     ))}

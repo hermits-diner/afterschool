@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, Course, ApiError } from '../../lib/api';
 import { CardGridSkeleton, EmptyState, CategoryBadge, EnrollBadge } from '../../components/ui';
-import { formatFee } from '../../lib/format';
+import { courseDisplayTitle } from '../../lib/format';
 import { useToast } from '../../context/ToastContext';
 import { useRegistrationOpen } from '../../lib/useSemester';
 
@@ -22,7 +22,7 @@ export default function StudentMyCourses() {
   }, []);
 
   async function cancel(c: Course) {
-    if (!confirm(`'${c.title}' 수강신청을 취소하시겠습니까?`)) return;
+    if (!confirm(`'${courseDisplayTitle(c)}' 수강신청을 취소하시겠습니까?`)) return;
     setBusy(c.id);
     try {
       await api.del(`/enrollments/${c.id}`);
@@ -36,7 +36,6 @@ export default function StudentMyCourses() {
   }
 
   if (!mine) return <CardGridSkeleton count={4} />;
-  const totalFee = mine.filter((c) => c.enrollment_status === 'enrolled').reduce((s, c) => s + c.fee, 0);
 
   return (
     <div>
@@ -61,7 +60,6 @@ export default function StudentMyCourses() {
                     <th className="th">강좌</th>
                     <th className="th">강사</th>
                     <th className="th">시간</th>
-                    <th className="th">수강료</th>
                     <th className="th">상태</th>
                     <th className="th text-right">관리</th>
                   </tr>
@@ -72,12 +70,11 @@ export default function StudentMyCourses() {
                       <td className="td">
                         <div className="flex items-center gap-2">
                           <CategoryBadge category={c.category} />
-                          <span className="font-semibold text-slate-800">{c.title}</span>
+                          <span className="font-semibold text-slate-800">{courseDisplayTitle(c)}</span>
                         </div>
                       </td>
                       <td className="td">{c.teacher_name}</td>
                       <td className="td whitespace-nowrap">{c.schedule_label}</td>
-                      <td className="td">{formatFee(c.fee)}</td>
                       <td className="td"><EnrollBadge status={c.enrollment_status} /></td>
                       <td className="td text-right">
                         <button className="btn-ghost btn-sm text-rose-600" onClick={() => cancel(c)} disabled={busy === c.id || locked}>
@@ -91,7 +88,7 @@ export default function StudentMyCourses() {
             </div>
           </div>
           <div className="flex items-center justify-between rounded-lg bg-brand-50 px-4 py-3 text-sm">
-            <span className="text-brand-700">총 {mine.length}개 강좌 신청 · 수강료 합계 <b>{formatFee(totalFee)}</b></span>
+            <span className="text-brand-700">총 <b>{mine.length}개</b> 강좌 신청</span>
             <Link to="/student/timetable" className="font-medium text-brand-600 hover:underline">시간표 보기 →</Link>
           </div>
         </>

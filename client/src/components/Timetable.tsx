@@ -1,5 +1,5 @@
 import { Course } from '../lib/api';
-import { categoryColor, DAYS, Slot } from '../lib/format';
+import { categoryColor, courseDisplayTitle, DAYS, Slot } from '../lib/format';
 
 function slotsOf(c: Course): Slot[] {
   return c.schedule && c.schedule.length ? c.schedule : [];
@@ -21,7 +21,8 @@ export default function Timetable({ courses }: { courses: Course[] }) {
 
   return (
     <div className="card overflow-x-auto p-4">
-      <table className="w-full min-w-[560px] border-collapse">
+      {/* table-fixed: 강좌명 길이와 무관하게 요일 열 폭 균등 (긴 제목은 truncate) */}
+      <table className="w-full min-w-[560px] table-fixed border-collapse">
         <thead>
           <tr>
             <th className="w-16 pb-2 text-center text-xs font-medium text-slate-400">교시</th>
@@ -44,9 +45,9 @@ export default function Timetable({ courses }: { courses: Course[] }) {
                       <div
                         key={c.id}
                         className={`mb-0.5 overflow-hidden rounded-md px-1.5 py-1 text-xs ${categoryColor(c.category)}`}
-                        title={`${c.title}${c.room ? ` · ${c.room}` : ''}`}
+                        title={`${courseDisplayTitle(c)}${c.room ? ` · ${c.room}` : ''}`}
                       >
-                        <div className="truncate font-semibold">{c.title}</div>
+                        <div className="truncate font-semibold">{courseDisplayTitle(c)}</div>
                         {c.room && <div className="truncate opacity-70">{c.room}</div>}
                       </div>
                     ))}
