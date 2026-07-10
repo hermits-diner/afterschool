@@ -15,6 +15,13 @@ interface Landing {
 
 const fmtDT = (s: string | null) => (s ? s.replace('T', ' ') : '');
 
+// 강좌 키워드 띠 — 데스크톱 하단·모바일 하단 마퀴 공용
+const KEYWORDS = [
+  '📖 수능 국어', '✍️ 영어 독해', '📐 수학 심화', '🌏 사회탐구', '🧪 과학탐구',
+  '📚 문학·독서', '🗣️ 영어 회화', '📝 논술', '🧮 미적분', '🔬 물리·화학 실험',
+  '🏛️ 한국사', '💻 프로그래밍', '🎨 미술', '🎹 음악', '⚽ 축구', '🏀 농구', '💃 댄스',
+];
+
 const ROLES: { key: Role; label: string; desc: string; icon: typeof Backpack }[] = [
   { key: 'student', label: '학생', desc: '강좌 조회 및 수강신청', icon: Backpack },
   { key: 'teacher', label: '강사', desc: '강좌 개설·수강생 관리', icon: Presentation },
@@ -111,27 +118,51 @@ export default function Login() {
           <div className="animate-marquee flex w-max gap-10 whitespace-nowrap text-sm font-medium text-white/60">
             {[0, 1].map((dup) => (
               <span key={dup} className="flex gap-10">
-                <span>📖 수능 국어</span><span>✍️ 영어 독해</span><span>📐 수학 심화</span>
-                <span>🌏 사회탐구</span><span>🧪 과학탐구</span><span>📚 문학·독서</span>
-                <span>🗣️ 영어 회화</span><span>📝 논술</span><span>🧮 미적분</span>
-                <span>🔬 물리·화학 실험</span><span>🏛️ 한국사</span>
-                <span>💻 프로그래밍</span><span>🎨 미술</span><span>🎹 음악</span>
-                <span>⚽ 축구</span><span>🏀 농구</span><span>💃 댄스</span>
+                {KEYWORDS.map((k) => (
+                  <span key={k}>{k}</span>
+                ))}
               </span>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Form panel */}
-      <div className="flex flex-1 items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-md">
-          <div className="mb-6 text-center lg:hidden">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white">
-              <GraduationCap size={30} />
-            </div>
-            <h1 className="mt-3 text-2xl font-bold text-slate-900">방과후학교 온라인 수강신청</h1>
+      {/* Mobile hero — 데스크톱 브랜드 패널의 축소판 (폼이 첫 화면에 보이도록 높이 절제) */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-brand-800 via-brand-900 to-brand-950 px-6 pb-14 pt-7 text-white lg:hidden">
+        <div className="anim-fade-up flex items-center gap-2.5">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+            <GraduationCap size={22} />
+          </span>
+          <div>
+            <div className="text-sm font-bold leading-tight">방과후학교</div>
+            <div className="text-[11px] text-white/60">온라인 수강신청 시스템</div>
           </div>
+        </div>
+        <div className="mt-5 flex items-end justify-between gap-4">
+          <h1 className="anim-fade-up anim-delay-1 text-xl font-bold leading-snug">
+            배움은 스스로를
+            <br />
+            만들어 가는 일입니다
+          </h1>
+          {/* 사진 스트립 — 콜라주 축소판 */}
+          <div className="anim-fade-up anim-delay-2 flex shrink-0 items-end gap-2">
+            <img
+              src="https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=300&q=70"
+              alt=""
+              className="h-16 w-12 -rotate-6 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
+            />
+            <img
+              src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=300&q=70"
+              alt=""
+              className="h-20 w-14 rotate-3 rounded-lg object-cover shadow-lg ring-1 ring-white/30"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Form panel — 모바일에서는 히어로 위로 살짝 겹쳐 올라옴 */}
+      <div className="relative -mt-6 flex flex-1 items-center justify-center rounded-t-3xl bg-slate-50 p-6 lg:mt-0 lg:rounded-none">
+        <div className="w-full max-w-md">
 
           {/* 공지 — 수강신청 기간·접수 상태 + 관리자 안내문 */}
           {landing && (landing.registration_start || landing.registration_end || landing.notice) && (
@@ -230,6 +261,19 @@ export default function Login() {
           <p className="mt-5 text-center text-sm text-slate-400">
             방과후학교 온라인 수강신청 시스템
           </p>
+        </div>
+      </div>
+
+      {/* 모바일 하단 키워드 띠 — 데스크톱 마퀴의 라이트 버전 */}
+      <div className="overflow-hidden border-t border-slate-200 bg-white py-2.5 lg:hidden">
+        <div className="animate-marquee flex w-max gap-8 whitespace-nowrap text-[13px] font-medium text-slate-400">
+          {[0, 1].map((dup) => (
+            <span key={dup} className="flex gap-8">
+              {KEYWORDS.map((k) => (
+                <span key={k}>{k}</span>
+              ))}
+            </span>
+          ))}
         </div>
       </div>
     </div>
