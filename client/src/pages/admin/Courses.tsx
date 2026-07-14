@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api, Course, CourseGroup, User, ApiError, fileToBase64, downloadCourseFile } from '../../lib/api';
 import { Modal, CategoryBadge, StatusBadge, EnrollBadge, Spinner, EmptyState, ProgressBar, TableSkeleton } from '../../components/ui';
 import { Icons } from '../../components/icons';
@@ -185,6 +185,29 @@ export default function AdminCourses() {
     return list;
   }, [courses, q, catFilter, statusFilter, sortKey]);
   const filterActive = !!(q.trim() || catFilter || statusFilter);
+
+  // 학년별 섹션 — 전학년 → 1학년 → 1·2학년 → 2학년 → 2·3학년 → 3학년. 섹션 내부는 위 정렬을 따른다.
+  const sections = useMemo(() => {
+    const map = new Map<string, Course[]>();
+    for (const c of view) {
+      const g = c.target_grades && c.target_grades.length && c.target_grades.length < 3 ? [...c.target_grades].sort((a, b) => a - b) : [];
+      const key = g.join(',');
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    const order = (key: string) => {
+      if (key === '') return -1; // 전학년 맨 앞
+      const nums = key.split(',').map(Number);
+      return Math.min(...nums) * 10 + nums.length;
+    };
+    return [...map.entries()]
+      .sort(([a], [b]) => order(a) - order(b))
+      .map(([key, list]) => ({
+        key,
+        label: targetGradesLabel(key === '' ? [] : key.split(',').map(Number)),
+        courses: list,
+      }));
+  }, [view]);
 
   /* ---------- 선택/전체 삭제 (휴지통 이동) + 복원 ---------- */
   const allSelected = view.length > 0 && view.every((c) => selected.has(c.id));
@@ -401,7 +424,7 @@ export default function AdminCourses() {
               <option value="cancelled">폐강</option>
             </select>
             <select className="input h-10 w-auto" value={sortKey} onChange={(e) => setSortKey(e.target.value as any)}>
-              <option value="default">기본 정렬 (학년순)</option>
+              <option value="default">기본 정렬 (교과군·이름순)</option>
               <option value="fill_desc">충원률 높은순</option>
               <option value="fill_asc">충원률 낮은순</option>
             </select>
@@ -414,14 +437,15 @@ export default function AdminCourses() {
           ) : (
         <div className="card overflow-hidden">
           <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[900px]">
               <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                 <tr>
                   <th className="th w-10">
                     <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
                   </th>
-                  <th className="th">학년</th>
+                  <th className="th">과목군</th>
                   <th className="th">강좌명</th>
+                  <th className="th">교과</th>
                   <th className="th">강사</th>
                   <th className="th">시간</th>
                   <th className="th">정원</th>
@@ -430,62 +454,75 @@ export default function AdminCourses() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {view.map((c) => (
-                  <tr key={c.id} className={`hover:bg-slate-50 ${selected.has(c.id) ? 'bg-brand-50/50' : ''}`}>
-                    <td className="td">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-brand-600"
-                        checked={selected.has(c.id)}
-                        onChange={() => toggleOne(c.id)}
-                      />
-                    </td>
-                    <td className="td whitespace-nowrap">{targetGradesLabel(c.target_grades)}</td>
-                    <td className="td">
-                      <div className="flex items-center gap-2">
-                        <CategoryBadge category={c.category} />
-                        <span className="font-semibold text-slate-800">{courseDisplayTitle(c)}</span>
-                      </div>
-                    </td>
-                    <td className="td">{c.teacher_name}</td>
-                    <td className="td whitespace-nowrap">
-                      {c.schedule_label}
-                      {c.room && <span className="text-slate-400"> · {c.room}</span>}
-                    </td>
-                    <td className="td">
-                      <button onClick={() => openRoster(c)} className="group w-24">
-                        <div className="mb-1 flex justify-between text-xs">
-                          <span className="font-medium text-slate-600 group-hover:text-brand-600">
-                            {c.enrolled_count}/{c.capacity}
-                          </span>
-                          {(c.wish_count || 0) > 0 && (
-                            <span className="font-semibold text-amber-600" title="빈자리 희망 학생 수 — 정원 증설 판단 참고">
-                              희망 {c.wish_count}
-                            </span>
+                {sections.map((sec) => (
+                  <Fragment key={sec.key || '__all__'}>
+                    {/* 학년 섹션 헤더 */}
+                    <tr>
+                      <td colSpan={9} className="border-t-2 border-slate-200 bg-slate-100/70 px-4 py-2 text-sm font-bold text-slate-700">
+                        {sec.label}
+                        <span className="ml-2 text-xs font-normal text-slate-400">{sec.courses.length}개</span>
+                      </td>
+                    </tr>
+                    {sec.courses.map((c) => (
+                      <tr key={c.id} className={`hover:bg-slate-50 ${selected.has(c.id) ? 'bg-brand-50/50' : ''}`}>
+                        <td className="td">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 accent-brand-600"
+                            checked={selected.has(c.id)}
+                            onChange={() => toggleOne(c.id)}
+                          />
+                        </td>
+                        <td className="td whitespace-nowrap">
+                          {c.group_name ? (
+                            <span className="inline-block rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">{c.group_name}</span>
+                          ) : (
+                            <span className="text-slate-300">—</span>
                           )}
-                        </div>
-                        <ProgressBar value={c.enrolled_count} max={c.capacity} />
-                      </button>
-                    </td>
-                    <td className="td"><StatusBadge status={c.status} /></td>
-                    <td className="td">
-                      <div className="flex items-center justify-end gap-1">
-                        {/* 안전한 조치 */}
-                        <button className="btn-ghost btn-sm" onClick={() => openEdit(c)}>수정</button>
-                        {c.status === 'open' ? (
-                          <button className="btn-ghost btn-sm text-amber-600" onClick={() => changeStatus(c, 'closed')}>마감</button>
-                        ) : c.status === 'closed' ? (
-                          <button className="btn-ghost btn-sm text-emerald-600" onClick={() => changeStatus(c, 'open')}>재개</button>
-                        ) : null}
-                        {/* 구분선 — 오른쪽은 되돌리기 어려운 조치 */}
-                        <span className="mx-1 h-4 w-px bg-slate-200" aria-hidden />
-                        {c.status !== 'cancelled' && (
-                          <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => changeStatus(c, 'cancelled')}>폐강</button>
-                        )}
-                        <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => remove(c)}>삭제</button>
-                      </div>
-                    </td>
-                  </tr>
+                        </td>
+                        <td className="td font-semibold text-slate-800">{c.title}</td>
+                        <td className="td"><CategoryBadge category={c.category} /></td>
+                        <td className="td">{c.teacher_name}</td>
+                        <td className="td whitespace-nowrap">
+                          {c.schedule_label}
+                          {c.room && <span className="text-slate-400"> · {c.room}</span>}
+                        </td>
+                        <td className="td">
+                          <button onClick={() => openRoster(c)} className="group w-24">
+                            <div className="mb-1 flex justify-between text-xs">
+                              <span className="font-medium text-slate-600 group-hover:text-brand-600">
+                                {c.enrolled_count}/{c.capacity}
+                              </span>
+                              {(c.wish_count || 0) > 0 && (
+                                <span className="font-semibold text-amber-600" title="빈자리 희망 학생 수 — 정원 증설 판단 참고">
+                                  희망 {c.wish_count}
+                                </span>
+                              )}
+                            </div>
+                            <ProgressBar value={c.enrolled_count} max={c.capacity} />
+                          </button>
+                        </td>
+                        <td className="td"><StatusBadge status={c.status} /></td>
+                        <td className="td">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* 안전한 조치 */}
+                            <button className="btn-ghost btn-sm" onClick={() => openEdit(c)}>수정</button>
+                            {c.status === 'open' ? (
+                              <button className="btn-ghost btn-sm text-amber-600" onClick={() => changeStatus(c, 'closed')}>마감</button>
+                            ) : c.status === 'closed' ? (
+                              <button className="btn-ghost btn-sm text-emerald-600" onClick={() => changeStatus(c, 'open')}>재개</button>
+                            ) : null}
+                            {/* 구분선 — 오른쪽은 되돌리기 어려운 조치 */}
+                            <span className="mx-1 h-4 w-px bg-slate-200" aria-hidden />
+                            {c.status !== 'cancelled' && (
+                              <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => changeStatus(c, 'cancelled')}>폐강</button>
+                            )}
+                            <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => remove(c)}>삭제</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
