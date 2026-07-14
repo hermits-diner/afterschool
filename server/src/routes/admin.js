@@ -311,6 +311,13 @@ router.put('/finance/calc', ah(async (req, res) => {
   res.json({ ok: true, calc: parsed.data });
 }));
 
+// 총수강료 계산 입력값 초기화 — 저장값을 지워 기본(모두 0 · 수강수의 합은 자동 집계)으로 되돌린다.
+router.delete('/finance/calc', ah(async (req, res) => {
+  const semester = (await getSettings()).semester;
+  await run('DELETE FROM settings WHERE key = ?', [`finance_calc:${semester}`]);
+  res.json({ ok: true });
+}));
+
 // 실시 회차 수동 입력/해제 — count: 숫자면 수동값 저장, null이면 출석부 자동 집계로 복원.
 router.patch('/courses/:id/sessions', ah(async (req, res) => {
   const schema = z.object({ count: z.number().int().min(0).max(999).nullable() });

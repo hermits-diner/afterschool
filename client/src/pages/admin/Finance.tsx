@@ -108,6 +108,21 @@ export default function AdminFinance() {
     }
   }
 
+  // 총수강료 계산 입력값 초기화 — 저장값을 지우고 기본(0 · 수강수의 합은 자동 집계)으로 되돌린다.
+  async function resetCalc() {
+    if (!confirm('총수강료 계산 입력값을 초기화하시겠습니까?\n입력한 총차시·총강좌수·차시당 강사료·수용비·교육청지원금·수강수의 합이 모두 지워지고, 수강수의 합은 자동 집계값으로 되돌아갑니다.')) return;
+    setCalcSaving(true);
+    try {
+      await api.del('/admin/finance/calc');
+      await load();
+      toast('총수강료 계산 입력값을 초기화했습니다.', 'success');
+    } catch {
+      toast('초기화에 실패했습니다.', 'error');
+    } finally {
+      setCalcSaving(false);
+    }
+  }
+
   async function saveSessions(id: number, count: number | null) {
     try {
       await api.patch(`/admin/courses/${id}/sessions`, { count });
@@ -166,9 +181,14 @@ export default function AdminFinance() {
             수강수의 합은 직접 입력할 수 있습니다 (해당 학년 수강확정 건수가 기본값으로 채워집니다).
           </p>
         </div>
-        <button className="btn-primary" onClick={saveCalc} disabled={calcSaving}>
-          {calcSaving ? '저장 중...' : '입력값 저장'}
-        </button>
+        <div className="flex gap-2">
+          <button className="btn-secondary" onClick={resetCalc} disabled={calcSaving}>
+            초기화
+          </button>
+          <button className="btn-primary" onClick={saveCalc} disabled={calcSaving}>
+            {calcSaving ? '저장 중...' : '입력값 저장'}
+          </button>
+        </div>
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         {CALC_GROUPS.map(({ key, label }) => {
