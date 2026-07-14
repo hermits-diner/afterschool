@@ -146,6 +146,7 @@ const groupSlotSchema = z
 const groupSchema = z.object({
   name: z.string().min(1, '교과군 이름을 입력하세요.').max(50),
   schedule: z.array(groupSlotSchema).min(1, '교시를 하나 이상 선택하세요.').max(20),
+  default_sessions: z.number().int().min(0).max(999).optional(), // 교과군 기본 계획 차시 (0 = 세션 기본값)
 });
 
 // 교과군은 활성 세션에 귀속 — 세션이 바뀌면 그 세션의 교과군을 새로 관리한다.
@@ -155,10 +156,11 @@ router.post('/groups', ah(async (req, res) => {
   const semester = (await getSettings()).semester;
   const dupe = await get('SELECT id FROM course_groups WHERE name = ? AND semester = ?', [parsed.data.name, semester]);
   if (dupe) return res.status(409).json({ error: '이 세션에 이미 존재하는 교과군 이름입니다.' });
-  const info = await run('INSERT INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', [
+  const info = await run('INSERT INTO course_groups (name, semester, schedule, default_sessions) VALUES (?, ?, ?, ?)', [
     parsed.data.name,
     semester,
     JSON.stringify(parsed.data.schedule),
+    parsed.data.default_sessions ?? 0,
   ]);
   res.status(201).json({ group: await get('SELECT * FROM course_groups WHERE id = ?', [info.lastInsertRowid]) });
 }));
@@ -171,9 +173,11 @@ router.put('/groups/:id', ah(async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.issues[0].message });
   const name = parsed.data.name ?? existing.name;
   const schedule = parsed.data.schedule ?? JSON.parse(existing.schedule);
-  await run('UPDATE course_groups SET name = ?, schedule = ? WHERE id = ?', [
+  const defaultSessions = parsed.data.default_sessions ?? existing.default_sessions ?? 0;
+  await run('UPDATE course_groups SET name = ?, schedule = ?, default_sessions = ? WHERE id = ?', [
     name,
     JSON.stringify(schedule),
+    defaultSessions,
     existing.id,
   ]);
   // 소속 강좌 시간 동기화
@@ -409,10 +413,11 @@ router.post('/semesters/:code/clone', ah(async (req, res) => {
   if (d.copy_groups || d.copy_courses) {
     const groups = await all('SELECT * FROM course_groups WHERE semester = ?', [src.code]);
     for (const g of groups) {
-      const info = await run('INSERT INTO course_groups (name, semester, schedule) VALUES (?, ?, ?)', [
+      const info = await run('INSERT INTO course_groups (name, semester, schedule, default_sessions) VALUES (?, ?, ?, ?)', [
         g.name,
         d.code,
         g.schedule,
+        g.default_sessions ?? 0,
       ]);
       groupMap[g.id] = info.lastInsertRowid;
       copiedGroups++;
@@ -876,7 +881,7 @@ router.post('/courses/bulk', ah(async (req, res) => {
         allGrades ? '' : gradeArr.join(','),
         c.fee ?? 0,
         c.pay_rate ?? 0,
-        defaultSessions,
+        group.default_sessions > 0 ? group.default_sessions : defaultSessions, // 교과군 기본 차시 우선
         JSON.stringify(slots),
         group.id,
         semester.code,

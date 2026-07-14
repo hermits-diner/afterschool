@@ -58,7 +58,12 @@ app.get('/api/groups', authRequired, ah(async (req, res) => {
   const semester = await getSetting('semester');
   const rows = await all('SELECT * FROM course_groups WHERE semester = ? ORDER BY name', [semester]);
   res.json({
-    groups: rows.map((g) => ({ id: g.id, name: g.name, schedule: JSON.parse(g.schedule) })),
+    groups: rows.map((g) => ({
+      id: g.id,
+      name: g.name,
+      schedule: JSON.parse(g.schedule),
+      default_sessions: g.default_sessions ?? 0,
+    })),
   });
 }));
 

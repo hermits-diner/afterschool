@@ -666,11 +666,23 @@ export default function AdminCourses() {
             <select
               className="input mb-2"
               value={form.group_id ?? ''}
-              onChange={(e) => setForm({ ...form, group_id: e.target.value ? Number(e.target.value) : null })}
+              onChange={(e) => {
+                const gid = e.target.value ? Number(e.target.value) : null;
+                const g = groups.find((x) => x.id === gid);
+                setForm((f) => ({
+                  ...f,
+                  group_id: gid,
+                  // 개설 시 교과군 기본 차시 자동 채움 (교과군마다 차시가 다를 수 있음). 이후 직접 수정 가능.
+                  planned_sessions: !editing && g && (g.default_sessions ?? 0) > 0 ? g.default_sessions! : f.planned_sessions,
+                }));
+              }}
             >
               <option value="">직접 지정 (아래 시간표에서 선택)</option>
               {groups.map((g) => (
-                <option key={g.id} value={g.id}>{g.name} — {scheduleLabel(g.schedule)}</option>
+                <option key={g.id} value={g.id}>
+                  {g.name} — {scheduleLabel(g.schedule)}
+                  {(g.default_sessions ?? 0) > 0 ? ` · ${g.default_sessions}차시` : ''}
+                </option>
               ))}
             </select>
             {form.group_id ? (

@@ -122,6 +122,7 @@ const SCHEMA = [
     name      TEXT NOT NULL,                  -- 교과군 이름 (예: 'A유형')
     semester  TEXT NOT NULL,                  -- 세션별 분리 — 같은 이름도 세션이 다르면 허용
     schedule  TEXT NOT NULL,                  -- JSON [{day,from,to}] — 비연속 교시/복수 요일 허용
+    default_sessions INTEGER NOT NULL DEFAULT 0,  -- 교과군 기본 계획 차시 (0 = 세션 기본값 따름)
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (name, semester)
   )`,
@@ -249,6 +250,10 @@ export async function initSchema() {
       'ALTER TABLE course_groups_new RENAME TO course_groups',
     ]);
   }
+  // 교과군별 기본 계획 차시 (0 = 세션 기본값 따름) — course_groups 재구성 이후에 추가해야 컬럼이 보존됨
+  await client
+    .execute('ALTER TABLE course_groups ADD COLUMN default_sessions INTEGER NOT NULL DEFAULT 0')
+    .catch(() => {});
 
   // Migrate the active semester (+ legacy flat settings) into the semesters table.
   const active = await getSetting('semester');

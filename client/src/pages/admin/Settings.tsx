@@ -108,7 +108,7 @@ export default function AdminSettings() {
   const [form, setForm] = useState<any>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<CourseGroup[]>([]);
-  const [groupForm, setGroupForm] = useState<{ id: number | null; name: string; schedule: Slot[] }>({ id: null, name: '', schedule: [] });
+  const [groupForm, setGroupForm] = useState<{ id: number | null; name: string; schedule: Slot[]; default_sessions: number }>({ id: null, name: '', schedule: [], default_sessions: 0 });
   const [groupSaving, setGroupSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeSaving, setNoticeSaving] = useState(false);
@@ -147,14 +147,15 @@ export default function AdminSettings() {
     if (groupForm.schedule.length === 0) return toast('시간표에서 교시를 하나 이상 선택하세요.', 'error');
     setGroupSaving(true);
     try {
+      const payload = { name: groupForm.name, schedule: groupForm.schedule, default_sessions: Number(groupForm.default_sessions) || 0 };
       if (groupForm.id) {
-        await api.put(`/admin/groups/${groupForm.id}`, { name: groupForm.name, schedule: groupForm.schedule });
+        await api.put(`/admin/groups/${groupForm.id}`, payload);
         toast('교과군이 수정되었습니다. 소속 강좌의 수업 시간도 함께 갱신됩니다.', 'success');
       } else {
-        await api.post('/admin/groups', { name: groupForm.name, schedule: groupForm.schedule });
+        await api.post('/admin/groups', payload);
         toast('교과군이 생성되었습니다.', 'success');
       }
-      setGroupForm({ id: null, name: '', schedule: [] });
+      setGroupForm({ id: null, name: '', schedule: [], default_sessions: 0 });
       loadGroups();
     } catch (err) {
       toast(err instanceof ApiError ? err.message : '저장 실패', 'error');
@@ -425,9 +426,15 @@ export default function AdminSettings() {
                   <div className="min-w-0">
                     <span className="font-bold text-slate-800">{g.name}</span>
                     <span className="ml-2 text-sm text-brand-700">{scheduleLabel(g.schedule)}</span>
+                    {(g.default_sessions ?? 0) > 0 && (
+                      <span className="ml-2 text-xs text-slate-500">· {g.default_sessions}차시</span>
+                    )}
                   </div>
                   <div className="flex gap-1">
-                    <button className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: g.id, name: g.name, schedule: g.schedule })}>
+                    <button
+                      className="btn-ghost btn-sm"
+                      onClick={() => setGroupForm({ id: g.id, name: g.name, schedule: g.schedule, default_sessions: g.default_sessions ?? 0 })}
+                    >
                       수정
                     </button>
                     <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeGroup(g)}>삭제</button>
@@ -441,7 +448,7 @@ export default function AdminSettings() {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-slate-800">{groupForm.id ? `교과군 수정 · ${groupForm.name}` : '새 교과군 만들기'}</h3>
               {groupForm.id && (
-                <button type="button" className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: null, name: '', schedule: [] })}>
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setGroupForm({ id: null, name: '', schedule: [], default_sessions: 0 })}>
                   + 새로 만들기
                 </button>
               )}
@@ -459,6 +466,21 @@ export default function AdminSettings() {
             <div>
               <label className="label">교시 블록 * — 시간표에서 클릭해 선택</label>
               <PeriodPicker value={groupForm.schedule} onChange={(v) => setGroupForm({ ...groupForm, schedule: v })} />
+            </div>
+            <div>
+              <label className="label">기본 계획 차시 — 이 교과군 강좌의 총 수업 횟수</label>
+              <input
+                type="number"
+                min={0}
+                className="input w-40"
+                value={groupForm.default_sessions || ''}
+                onChange={(e) => setGroupForm({ ...groupForm, default_sessions: Number(e.target.value) })}
+                placeholder="세션 기본값 사용"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                비워두거나 0이면 세션의 기본 계획 차시를 따릅니다. 교과군(유형)마다 차시가 다르면 여기에 지정하세요
+                — 이 교과군으로 강좌를 개설할 때 자동 적용됩니다.
+              </p>
             </div>
             {groupForm.id && (
               <p className="text-xs text-amber-600">⚠️ 저장하면 이 교과군 소속 강좌들의 수업 시간이 새 교시로 일괄 변경됩니다.</p>
@@ -556,6 +578,7 @@ export default function AdminSettings() {
             <div>
               <label className="label">기본 계획 차시</label>
               <input type="number" min={0} className="input" value={form.default_sessions} onChange={(e) => setForm({ ...form, default_sessions: e.target.value })} />
+              <p className="mt-1 text-xs text-slate-400">교과군에 차시를 따로 정하지 않았을 때 쓰는 기본값</p>
             </div>
             <div className="flex items-end pb-1">
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">

@@ -55,6 +55,7 @@ export interface CourseGroup {
   id: number;
   name: string;
   schedule: { day: string; from: number; to: number }[];
+  default_sessions?: number; // 교과군 기본 계획 차시 (0/미설정 = 세션 기본값 따름)
 }
 
 const TOKEN_KEY = 'afterschool_token';

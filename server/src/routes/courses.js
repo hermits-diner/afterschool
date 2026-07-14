@@ -106,6 +106,15 @@ function sortSlots(slots) {
   return [...slots].sort((a, b) => DAY_ORDER[a.day] - DAY_ORDER[b.day] || a.from - b.from);
 }
 
+// 기본 계획 차시 — 교과군 값(>0)을 우선, 없으면 세션 기본값. 교과군마다 차시가 다를 수 있어 교과군 기준.
+async function defaultPlannedSessions(groupId) {
+  if (groupId) {
+    const g = await get('SELECT default_sessions FROM course_groups WHERE id = ?', [groupId]);
+    if (g && g.default_sessions > 0) return g.default_sessions;
+  }
+  return (await getActiveSemester()).default_sessions ?? 16;
+}
+
 // group_id/schedule 입력을 슬롯 배열로 해석. 반환: {slots, group_id} 또는 null(변경 없음).
 // 교과군은 세션별 — 활성 세션의 교과군만 선택할 수 있다.
 async function resolveSchedule(d) {
@@ -179,13 +188,14 @@ router.post('/', authRequired, requireRole('admin', 'teacher'), ah(async (req, r
     d.teacher_id = req.user.id; // 강사는 본인 강좌만
     d.pay_rate = 0; // 강사료 단가는 관리자가 책정
     d.fee = 0; // 수강료는 관리자가 책정
-    d.planned_sessions = (await getActiveSemester()).default_sessions ?? 16; // 세션 기본 계획 차시 자동 적용
     // 교과군이 정의되어 있으면 강사는 교과군으로만 시간 지정
     const groupCount = (await get('SELECT COUNT(*) c FROM course_groups WHERE semester = ?', [await getSetting('semester')])).c;
     if (groupCount > 0) {
       if (!d.group_id) return res.status(400).json({ error: '교과군을 선택하세요.' });
       delete d.schedule;
     }
+    // 계획 차시 = 교과군 기본값(있으면) 우선, 없으면 세션 기본값
+    d.planned_sessions = await defaultPlannedSessions(d.group_id);
   }
   const resolved = await resolveSchedule(d);
   if (resolved?.error) return res.status(400).json({ error: resolved.error });
