@@ -37,6 +37,44 @@ function sessionNamePreview(code: string) {
   return `${m[1]}학년도 ${part}`;
 }
 
+// 날짜 + 시각 분리 입력: 날짜는 date 피커로, 시각은 기본값(시작 00:00 / 종료 23:59)으로 미리 채워
+// 대부분 날짜만 고르면 되고, 필요할 때만 시각을 조정. 값은 'YYYY-MM-DDTHH:MM' 문자열로 합쳐 전달.
+function DateTimeField({
+  label,
+  value,
+  defaultTime,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  defaultTime: string; // '00:00' | '23:59'
+  onChange: (v: string) => void;
+}) {
+  const [datePart, timePartRaw] = value ? value.split('T') : ['', ''];
+  const timePart = timePartRaw ? timePartRaw.slice(0, 5) : defaultTime;
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <div className="flex gap-2">
+        <input
+          type="date"
+          className="input flex-1"
+          value={datePart}
+          onChange={(e) => onChange(e.target.value ? `${e.target.value}T${timePart}` : '')}
+        />
+        <input
+          type="time"
+          className="input w-28"
+          value={timePart}
+          disabled={!datePart}
+          title={datePart ? '' : '먼저 날짜를 선택하세요'}
+          onChange={(e) => onChange(datePart ? `${datePart}T${e.target.value || defaultTime}` : '')}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminSettings() {
   const toast = useToast();
   const [semesters, setSemesters] = useState<Semester[] | null>(null);
@@ -453,15 +491,23 @@ export default function AdminSettings() {
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="label">신청 시작 (날짜·시각)</label>
-              <input type="datetime-local" className="input" value={form.registration_start} onChange={(e) => setForm({ ...form, registration_start: e.target.value })} />
-            </div>
-            <div>
-              <label className="label">신청 종료 (날짜·시각)</label>
-              <input type="datetime-local" className="input" value={form.registration_end} onChange={(e) => setForm({ ...form, registration_end: e.target.value })} />
-            </div>
+            <DateTimeField
+              label="신청 시작 (날짜 선택 · 기본 00:00)"
+              value={form.registration_start}
+              defaultTime="00:00"
+              onChange={(v) => setForm({ ...form, registration_start: v })}
+            />
+            <DateTimeField
+              label="신청 종료 (날짜 선택 · 기본 23:59)"
+              value={form.registration_end}
+              defaultTime="23:59"
+              onChange={(v) => setForm({ ...form, registration_end: v })}
+            />
           </div>
+          <p className="-mt-2 text-xs text-slate-400">
+            날짜만 고르면 시각은 <b>시작 00:00 · 종료 23:59</b>로 자동 설정됩니다. 특정 시각(예: 09:00 시작)이 필요하면 옆의 시각 칸을 바꾸세요.
+            아래 <b>저장</b> 버튼을 눌러야 확정됩니다.
+          </p>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label className="label">1인당 최대 신청 강좌 수</label>
