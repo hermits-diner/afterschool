@@ -42,13 +42,22 @@ router.get('/stats', ah(async (req, res) => {
     [semester]
   );
 
-  // top courses by fill rate
+  // 개설(모집중) 강좌 — 충원률 기준 인기순 상위 5개 + 운영 신호(마감 임박·정원 미달)
   const openCourses = await all("SELECT * FROM courses WHERE semester=? AND status='open'", [semester]);
-  const courses = (await decorateCourses(openCourses))
-    .sort((a, b) => b.enrolled_count / b.capacity - a.enrolled_count / a.capacity)
-    .slice(0, 5);
+  const decorated = await decorateCourses(openCourses);
+  const fill = (c) => (c.capacity > 0 ? c.enrolled_count / c.capacity : 0);
+  const courses = [...decorated].sort((a, b) => fill(b) - fill(a)).slice(0, 5);
 
-  res.json({ counts, byCategory, popularCourses: courses });
+  // 마감 임박: 충원률 90% 이상 (증원 검토) — 임박한 순
+  const nearFull = decorated
+    .filter((c) => c.capacity > 0 && fill(c) >= 0.9)
+    .sort((a, b) => fill(b) - fill(a));
+  // 정원 미달: 충원률 30% 미만 (폐강·홍보 검토) — 저조한 순
+  const underEnrolled = decorated
+    .filter((c) => c.capacity > 0 && fill(c) < 0.3)
+    .sort((a, b) => fill(a) - fill(b));
+
+  res.json({ counts, byCategory, popularCourses: courses, alerts: { nearFull, underEnrolled } });
 }));
 
 /* ---------------- 반별 신청 현황 ---------------- */

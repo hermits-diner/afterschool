@@ -37,6 +37,30 @@ function sessionNamePreview(code: string) {
   return `${m[1]}학년도 ${part}`;
 }
 
+// 신청기간 진행 상태 — 접수중 세션 카드에 표시할 진행바/ D-day. 값이 부족하면 null.
+const PROG_TONE = {
+  slate: { text: 'text-slate-500', bar: 'bg-slate-400' },
+  emerald: { text: 'text-emerald-600', bar: 'bg-emerald-500' },
+  rose: { text: 'text-rose-600', bar: 'bg-rose-500' },
+} as const;
+function regProgress(s: Semester): { pct: number; label: string; tone: keyof typeof PROG_TONE } | null {
+  if (s.registration_open !== 'true' || !s.registration_start || !s.registration_end) return null;
+  const norm = (v: string, endOfDay: boolean) => (v.includes('T') ? v : `${v}T${endOfDay ? '23:59' : '00:00'}`);
+  const start = new Date(norm(s.registration_start, false)).getTime();
+  const end = new Date(norm(s.registration_end, true)).getTime();
+  const now = Date.now();
+  if (isNaN(start) || isNaN(end) || end <= start) return null;
+  const DAY = 86400000;
+  if (now < start) return { pct: 0, label: `시작 D-${Math.ceil((start - now) / DAY)}`, tone: 'slate' };
+  if (now > end) return { pct: 100, label: '신청기간 종료', tone: 'rose' };
+  const dleft = Math.floor((end - now) / DAY);
+  return {
+    pct: Math.round(((now - start) / (end - start)) * 100),
+    label: dleft <= 0 ? '오늘 마감' : `마감까지 D-${dleft}`,
+    tone: 'emerald',
+  };
+}
+
 // 날짜 + 시각 분리 입력: 날짜는 date 피커로, 시각은 기본값(시작 00:00 / 종료 23:59)으로 미리 채워
 // 대부분 날짜만 고르면 되고, 필요할 때만 시각을 조정. 값은 'YYYY-MM-DDTHH:MM' 문자열로 합쳐 전달.
 function DateTimeField({
@@ -317,6 +341,22 @@ export default function AdminSettings() {
                     <span>기본 {s.default_sessions ?? 16}차시</span>
                     <span className="font-medium text-slate-700">강좌 {s.course_count}개 · 신청 {s.enrollment_count}건</span>
                   </div>
+                  {(() => {
+                    const p = regProgress(s);
+                    if (!p) return null;
+                    const tone = PROG_TONE[p.tone];
+                    return (
+                      <div className="mt-2 max-w-md">
+                        <div className="mb-1 flex justify-between text-xs">
+                          <span className="text-slate-400">신청 진행</span>
+                          <span className={`font-semibold ${tone.text}`}>{p.label}</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div className={`h-full rounded-full ${tone.bar} transition-all`} style={{ width: `${p.pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex gap-1.5">
                   {/* 접수 토글은 모든 세션에서 가능 — 활성 세션과 별개로 특강 등 두 세션 동시 접수 지원 */}

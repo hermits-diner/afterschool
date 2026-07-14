@@ -99,9 +99,9 @@ export default function AdminEnrollments() {
         <EmptyState message="수강신청 내역이 없습니다." />
       ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full min-w-[720px]">
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                 <tr>
                   <th className="th">학생</th>
                   <th className="th">학년/반/번호</th>

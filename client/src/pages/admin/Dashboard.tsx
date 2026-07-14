@@ -14,6 +14,68 @@ interface Stats {
   };
   byCategory: { category: string; count: number }[];
   popularCourses: Course[];
+  alerts: { nearFull: Course[]; underEnrolled: Course[] };
+}
+
+// 운영 신호 카드 — 마감 임박 / 정원 미달 강좌 목록 (신청 마감일 판단용)
+function AlertCard({
+  title,
+  hint,
+  tone,
+  courses,
+  empty,
+}: {
+  title: string;
+  hint: string;
+  tone: 'rose' | 'amber';
+  courses: Course[];
+  empty: string;
+}) {
+  const dot = tone === 'rose' ? 'bg-rose-500' : 'bg-amber-500';
+  const bar = tone === 'rose' ? 'bg-rose-500' : 'bg-amber-500';
+  const shown = courses.slice(0, 5);
+  return (
+    <div className="card p-6">
+      <div className="mb-4 flex items-baseline justify-between">
+        <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+          <span className={`h-2 w-2 rounded-full ${dot}`} />
+          {title}
+          <span className="text-xs font-normal text-slate-400">{courses.length}개</span>
+        </h2>
+        <span className="text-xs text-slate-400">{hint}</span>
+      </div>
+      {courses.length === 0 ? (
+        <p className="py-3 text-sm text-slate-400">{empty}</p>
+      ) : (
+        <ul className="space-y-1">
+          {shown.map((c) => {
+            const pct = c.capacity === 0 ? 0 : Math.round((c.enrolled_count / c.capacity) * 100);
+            return (
+              <li key={c.id} className="-mx-2 flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-semibold text-slate-800">{c.title}</p>
+                    <span className="shrink-0 text-xs text-slate-400">{c.teacher_name}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, pct)}%` }} />
+                    </div>
+                    <span className="w-14 shrink-0 text-right text-xs text-slate-500 [font-variant-numeric:tabular-nums]">
+                      {c.enrolled_count}/{c.capacity} · {pct}%
+                    </span>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+          {courses.length > shown.length && (
+            <li className="px-2 pt-1 text-xs text-slate-400">외 {courses.length - shown.length}개</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 function DashboardSkeleton() {
@@ -56,7 +118,7 @@ export default function AdminDashboard() {
   }, []);
 
   if (!data) return <DashboardSkeleton />;
-  const { counts, byCategory, popularCourses } = data;
+  const { counts, byCategory, popularCourses, alerts } = data;
 
   const totalByCategory = byCategory.reduce((s, c) => s + c.count, 0);
   const maxCat = Math.max(1, ...byCategory.map((c) => c.count));
@@ -100,6 +162,26 @@ export default function AdminDashboard() {
       <PageHeader title="관리자 대시보드" sub="2026학년도 1학기 방과후학교 운영 현황입니다." />
 
       <StatBand items={stats} className="anim-fade-up anim-delay-1" />
+
+      {/* 운영 신호 — 마감 임박 / 정원 미달 (있을 때만 표시) */}
+      {(alerts?.nearFull.length > 0 || alerts?.underEnrolled.length > 0) && (
+        <div className="anim-fade-up anim-delay-2 mt-6 grid gap-6 lg:grid-cols-2">
+          <AlertCard
+            title="마감 임박"
+            hint="충원률 90% 이상 · 증원 검토"
+            tone="rose"
+            courses={alerts.nearFull}
+            empty="마감 임박한 강좌가 없습니다."
+          />
+          <AlertCard
+            title="정원 미달"
+            hint="충원률 30% 미만 · 폐강·홍보 검토"
+            tone="amber"
+            courses={alerts.underEnrolled}
+            empty="정원 미달 강좌가 없습니다."
+          />
+        </div>
+      )}
 
       {/* 비대칭 3:2 그리드 */}
       <div className="mt-6 grid gap-6 lg:grid-cols-5">

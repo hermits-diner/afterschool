@@ -85,6 +85,11 @@ export default function AdminCourses() {
   const [deleting, setDeleting] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [trash, setTrash] = useState<TrashItem[] | null>(null);
+  // 검색·필터·정렬
+  const [q, setQ] = useState('');
+  const [catFilter, setCatFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortKey, setSortKey] = useState<'default' | 'fill_desc' | 'fill_asc'>('default');
 
   async function load() {
     const r = await api.get<{ courses: Course[] }>('/courses');
@@ -159,11 +164,32 @@ export default function AdminCourses() {
     }
   }
 
+  // 목록: 검색·필터 → 정렬 (기본 정렬 = 학년 → 교과군 → 강좌명)
+  const view = useMemo(() => {
+    let list = [...(courses || [])];
+    const kw = q.trim().toLowerCase();
+    if (kw) list = list.filter((c) => c.title.toLowerCase().includes(kw) || (c.teacher_name || '').toLowerCase().includes(kw));
+    if (catFilter) list = list.filter((c) => c.category === catFilter);
+    if (statusFilter) list = list.filter((c) => c.status === statusFilter);
+    const fill = (c: Course) => (c.capacity > 0 ? c.enrolled_count / c.capacity : 0);
+    const gradeKey = (c: Course) => (c.target_grades && c.target_grades.length ? Math.min(...c.target_grades) : 0);
+    if (sortKey === 'fill_desc') list.sort((a, b) => fill(b) - fill(a));
+    else if (sortKey === 'fill_asc') list.sort((a, b) => fill(a) - fill(b));
+    else
+      list.sort(
+        (a, b) =>
+          gradeKey(a) - gradeKey(b) ||
+          (a.group_name || '힣').localeCompare(b.group_name || '힣', 'ko') ||
+          a.title.localeCompare(b.title, 'ko')
+      );
+    return list;
+  }, [courses, q, catFilter, statusFilter, sortKey]);
+  const filterActive = !!(q.trim() || catFilter || statusFilter);
+
   /* ---------- 선택/전체 삭제 (휴지통 이동) + 복원 ---------- */
-  const allSelected = !!courses && courses.length > 0 && courses.every((c) => selected.has(c.id));
+  const allSelected = view.length > 0 && view.every((c) => selected.has(c.id));
   function toggleAll() {
-    if (!courses) return;
-    setSelected(allSelected ? new Set() : new Set(courses.map((c) => c.id)));
+    setSelected(allSelected ? new Set() : new Set(view.map((c) => c.id)));
   }
   function toggleOne(id: number) {
     const next = new Set(selected);
@@ -173,19 +199,6 @@ export default function AdminCourses() {
 
   const selectedCourses = (courses || []).filter((c) => selected.has(c.id));
   const selectedEnrollments = selectedCourses.reduce((sum, c) => sum + c.enrolled_count, 0);
-
-  // 목록 정렬: 학년(전학년 먼저) → 교과군 이름 → 강좌명
-  const sorted = useMemo(() => {
-    if (!courses) return [];
-    const gradeKey = (c: Course) =>
-      c.target_grades && c.target_grades.length ? Math.min(...c.target_grades) : 0;
-    return [...courses].sort(
-      (a, b) =>
-        gradeKey(a) - gradeKey(b) ||
-        (a.group_name || '힣').localeCompare(b.group_name || '힣', 'ko') ||
-        a.title.localeCompare(b.title, 'ko')
-    );
-  }, [courses]);
 
   async function bulkDelete() {
     if (delConfirm !== '삭제') return;
@@ -301,6 +314,8 @@ export default function AdminCourses() {
   }
 
   async function changeStatus(c: Course, status: string) {
+    // 폐강은 되돌리기 번거로운 조치 — 한 번 더 확인
+    if (status === 'cancelled' && !confirm(`'${courseDisplayTitle(c)}' 강좌를 폐강하시겠습니까?\n학생 화면에서 사라지고 더 이상 신청을 받지 않습니다. (기존 신청 내역은 유지됩니다)`)) return;
     await api.patch(`/courses/${c.id}/status`, { status });
     toast(status === 'cancelled' ? '강좌를 폐강했습니다.' : '상태가 변경되었습니다.', 'success');
     load();
@@ -366,10 +381,41 @@ export default function AdminCourses() {
       {courses.length === 0 ? (
         <EmptyState message="개설된 강좌가 없습니다." sub="강좌 개설 버튼으로 첫 강좌를 만들어 보세요." />
       ) : (
+        <>
+          {/* 검색·필터·정렬 */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <input
+              className="input h-10 w-full sm:w-64"
+              placeholder="강좌명·강사 검색"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select className="input h-10 w-auto" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+              <option value="">전체 교과</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="input h-10 w-auto" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">전체 상태</option>
+              <option value="open">모집중</option>
+              <option value="closed">마감</option>
+              <option value="cancelled">폐강</option>
+            </select>
+            <select className="input h-10 w-auto" value={sortKey} onChange={(e) => setSortKey(e.target.value as any)}>
+              <option value="default">기본 정렬 (학년순)</option>
+              <option value="fill_desc">충원률 높은순</option>
+              <option value="fill_asc">충원률 낮은순</option>
+            </select>
+            <span className="ml-auto text-sm text-slate-500">
+              {filterActive ? <><b className="text-slate-800">{view.length}</b>개 / 전체 {courses.length}개</> : <>전체 <b className="text-slate-800">{courses.length}</b>개</>}
+            </span>
+          </div>
+          {view.length === 0 ? (
+            <EmptyState message="조건에 맞는 강좌가 없습니다." sub="검색어나 필터를 바꿔 보세요." />
+          ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full min-w-[820px]">
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                 <tr>
                   <th className="th w-10">
                     <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
@@ -384,7 +430,7 @@ export default function AdminCourses() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sorted.map((c) => (
+                {view.map((c) => (
                   <tr key={c.id} className={`hover:bg-slate-50 ${selected.has(c.id) ? 'bg-brand-50/50' : ''}`}>
                     <td className="td">
                       <input
@@ -423,17 +469,20 @@ export default function AdminCourses() {
                     </td>
                     <td className="td"><StatusBadge status={c.status} /></td>
                     <td className="td">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* 안전한 조치 */}
                         <button className="btn-ghost btn-sm" onClick={() => openEdit(c)}>수정</button>
                         {c.status === 'open' ? (
                           <button className="btn-ghost btn-sm text-amber-600" onClick={() => changeStatus(c, 'closed')}>마감</button>
                         ) : c.status === 'closed' ? (
                           <button className="btn-ghost btn-sm text-emerald-600" onClick={() => changeStatus(c, 'open')}>재개</button>
                         ) : null}
+                        {/* 구분선 — 오른쪽은 되돌리기 어려운 조치 */}
+                        <span className="mx-1 h-4 w-px bg-slate-200" aria-hidden />
                         {c.status !== 'cancelled' && (
-                          <button className="btn-ghost btn-sm text-rose-600" onClick={() => changeStatus(c, 'cancelled')}>폐강</button>
+                          <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => changeStatus(c, 'cancelled')}>폐강</button>
                         )}
-                        <button className="btn-ghost btn-sm text-rose-600" onClick={() => remove(c)}>삭제</button>
+                        <button className="btn-ghost btn-sm text-rose-500 hover:bg-rose-50" onClick={() => remove(c)}>삭제</button>
                       </div>
                     </td>
                   </tr>
@@ -442,6 +491,8 @@ export default function AdminCourses() {
             </table>
           </div>
         </div>
+          )}
+        </>
       )}
 
       {/* 선택 삭제 확인 모달 — 이중 예방: 위험 안내 + '삭제' 입력 */}
