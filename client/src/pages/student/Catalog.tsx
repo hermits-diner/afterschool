@@ -110,6 +110,8 @@ export default function StudentCatalog() {
   }
 
   async function cancel(c: Course) {
+    // 실수 취소 방지 — 공용 PC 환경에서 오클릭 예방
+    if (!confirm(`'${courseDisplayTitle(c)}' 수강신청을 취소하시겠습니까?\n취소하면 이 자리는 다른 학생이 신청할 수 있어 다시 신청하지 못할 수 있습니다.`)) return;
     setBusy(c.id);
     try {
       await api.del(`/enrollments/${c.id}`);
@@ -218,6 +220,7 @@ export default function StudentCatalog() {
             const cLocked = !c.accepting; // 강좌 소속 세션의 접수 여부
             const wished = wishIds.has(c.id);
             const seatOpened = wished && !c.is_full && !closed && !cLocked; // 희망 강좌에 빈자리 발생
+            const lowSeats = !c.is_full && c.seats_left > 0 && c.seats_left <= 2 && !closed && !cLocked; // 임박(1~2석)
             return (
               <div key={c.id} className={`card flex flex-col p-5 ${seatOpened ? 'ring-2 ring-amber-400' : ''}`}>
                 <div className="mb-2 flex items-center justify-between">
@@ -237,6 +240,8 @@ export default function StudentCatalog() {
                       <span className="font-bold text-amber-600">🔔 빈자리 생김! 지금 신청하세요</span>
                     ) : c.is_full ? (
                       <span className="font-medium text-rose-600">정원 마감</span>
+                    ) : lowSeats ? (
+                      <span className="font-semibold text-amber-600">⚠ {c.seats_left}자리 남음 · 마감 임박</span>
                     ) : (
                       <span className="font-medium text-emerald-600">{c.seats_left}자리 남음</span>
                     )}

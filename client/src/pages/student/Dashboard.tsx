@@ -5,6 +5,7 @@ import { EmptyState, CategoryBadge, EnrollBadge, PageHeader, StatBand, CardGridS
 import { Icons } from '../../components/icons';
 import { useAuth } from '../../context/AuthContext';
 import { courseDisplayTitle } from '../../lib/format';
+import Timetable from '../../components/Timetable';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -83,6 +84,19 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      {/* 미니 주간 시간표 — 신청 강좌가 있을 때 한눈에 (전체 시간표로 연결) */}
+      {enrolled.length > 0 && (
+        <div className="anim-fade-up anim-delay-3 mt-8">
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-base font-bold text-slate-900">이번 주 시간표</h2>
+            <Link to="/student/timetable" className="text-sm font-medium text-brand-600 hover:underline">
+              전체 시간표 →
+            </Link>
+          </div>
+          <Timetable courses={enrolled} />
+        </div>
+      )}
     </div>
   );
 }
