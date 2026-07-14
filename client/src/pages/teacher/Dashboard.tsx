@@ -77,7 +77,7 @@ export default function TeacherDashboard() {
                 <div className="mb-2 flex items-center justify-between">
                   <CategoryBadge category={c.category} />
                   <span className="text-xs text-slate-400">
-                    {c.day_of_week} {c.start_time}
+                    {c.schedule_label || `${c.day_of_week} ${c.start_time}`}
                   </span>
                 </div>
                 <h3 className="mb-3 font-bold text-slate-900 transition-colors group-hover:text-brand-700">{courseDisplayTitle(c)}</h3>
