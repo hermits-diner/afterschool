@@ -437,12 +437,13 @@ export default function AdminCourses() {
           ) : (
         <div className="card overflow-hidden">
           <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[960px]">
               <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                 <tr>
                   <th className="th w-10">
                     <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={allSelected} onChange={toggleAll} />
                   </th>
+                  <th className="th">학년</th>
                   <th className="th">과목군</th>
                   <th className="th">강좌명</th>
                   <th className="th">교과</th>
@@ -458,7 +459,7 @@ export default function AdminCourses() {
                   <Fragment key={sec.key || '__all__'}>
                     {/* 학년 섹션 헤더 */}
                     <tr>
-                      <td colSpan={9} className="border-t-2 border-slate-200 bg-slate-100/70 px-4 py-2 text-sm font-bold text-slate-700">
+                      <td colSpan={10} className="border-t-2 border-slate-200 bg-slate-100/70 px-4 py-2 text-sm font-bold text-slate-700">
                         {sec.label}
                         <span className="ml-2 text-xs font-normal text-slate-400">{sec.courses.length}개</span>
                       </td>
@@ -473,6 +474,7 @@ export default function AdminCourses() {
                             onChange={() => toggleOne(c.id)}
                           />
                         </td>
+                        <td className="td whitespace-nowrap text-slate-600">{targetGradesLabel(c.target_grades)}</td>
                         <td className="td whitespace-nowrap">
                           {c.group_name ? (
                             <span className="inline-block rounded-md bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">{c.group_name}</span>
