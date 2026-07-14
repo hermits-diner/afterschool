@@ -17,10 +17,19 @@ export default function PrintFinance() {
   if (!data) return <PrintLoading />;
   const { courses, byTeacher, totals } = data;
 
+  // ?section=course → 강좌별만, ?section=teacher → 강사별만, 없으면 둘 다 (전체 보고서)
+  const section = new URLSearchParams(window.location.search).get('section');
+  const showCourse = section !== 'teacher';
+  const showTeacher = section !== 'course';
+  const title =
+    section === 'course' ? '방과후학교 강좌별 강사료' : section === 'teacher' ? '방과후학교 강사별 강사료' : '방과후학교 강사료 정산 보고서';
+
   return (
-    <PrintShell title="방과후학교 강사료 정산 보고서" hint="강사료 보고서 미리보기 · 인쇄(Ctrl/⌘+P)" width="lg">
+    <PrintShell title={title} hint="강사료 보고서 미리보기 · 인쇄(Ctrl/⌘+P)" width="lg">
       <PrintMeta>총 강사료 {won(totals.teacher_pay)}원</PrintMeta>
 
+      {showCourse && (
+      <>
       <h2 className="mb-2 text-base font-bold text-slate-800">강좌별 강사료 (단위: 원)</h2>
       <table className="print-table mb-8 w-full border-collapse text-sm">
         <thead>
@@ -52,7 +61,11 @@ export default function PrintFinance() {
           </tr>
         </tbody>
       </table>
+      </>
+      )}
 
+      {showTeacher && (
+      <>
       <h2 className="mb-2 text-base font-bold text-slate-800">강사별 강사료 집계 (지급용, 단위: 원)</h2>
       <table className="print-table w-full border-collapse text-sm">
         <thead>
@@ -83,6 +96,8 @@ export default function PrintFinance() {
           </tr>
         </tbody>
       </table>
+      </>
+      )}
     </PrintShell>
   );
 }

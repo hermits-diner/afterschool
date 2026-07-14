@@ -82,6 +82,8 @@ export default function AdminFinance() {
   const [editVal, setEditVal] = useState('');
   const [calc, setCalc] = useState<Record<CalcGroupKey, CalcInputs>>({ g12: emptyCalc, g3: emptyCalc });
   const [calcSaving, setCalcSaving] = useState(false);
+  const [bulkRate, setBulkRate] = useState(''); // 차시당(회당) 강사료 일괄 적용 입력값
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   async function load() {
     const r = await api.get<FinanceData>('/admin/finance');
@@ -91,6 +93,9 @@ export default function AdminFinance() {
       g12: { ...emptyCalc, enroll_total: r.enrollTotals.g12, ...r.calc?.g12 },
       g3: { ...emptyCalc, enroll_total: r.enrollTotals.g3, ...r.calc?.g3 },
     });
+    // 전 강좌가 같은 단가면 그 값을 일괄 적용 입력칸에 미리 채운다.
+    const rates = [...new Set(r.courses.map((c) => c.pay_rate).filter((x) => x > 0))];
+    setBulkRate(rates.length === 1 ? String(rates[0]) : '');
   }
   useEffect(() => {
     load();
@@ -123,6 +128,23 @@ export default function AdminFinance() {
     }
   }
 
+  // 차시당(회당) 강사료 일괄 적용 — 전 강좌에 같은 단가 설정 후 재집계
+  async function applyBulkRate() {
+    const rate = Number(bulkRate);
+    if (bulkRate === '' || !Number.isInteger(rate) || rate < 0) return toast('회당 강사료를 숫자로 입력하세요.', 'error');
+    if (!confirm(`전 강좌의 회당(차시당) 강사료를 ${won(rate)}(으)로 일괄 적용하시겠습니까?\n개별로 다르게 설정한 강좌가 있으면 이 값으로 덮어씁니다.`)) return;
+    setBulkSaving(true);
+    try {
+      const r = await api.put<{ updated: number }>('/admin/finance/pay-rate', { pay_rate: rate });
+      toast(`${r.updated}개 강좌에 회당 강사료 ${won(rate)}를 적용했습니다.`, 'success');
+      load();
+    } catch {
+      toast('일괄 적용에 실패했습니다.', 'error');
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   async function saveSessions(id: number, count: number | null) {
     try {
       await api.patch(`/admin/courses/${id}/sessions`, { count });
@@ -134,15 +156,29 @@ export default function AdminFinance() {
     }
   }
 
+  // 강좌별 강사료 CSV
   function exportCsv() {
     if (!data) return;
     downloadCsv(
-      `정산_${data.semester}_${new Date().toISOString().slice(0, 10)}.csv`,
+      `강좌별강사료_${data.semester}_${new Date().toISOString().slice(0, 10)}.csv`,
       ['강좌', '교과', '강사', '수강인원', '수강료단가', '수강료수입', '회당강사료', '실시회차', '강사료'],
       data.courses.map((r) => [courseDisplayTitle(r), r.category, r.teacher_name, r.enrolled_count, r.fee, r.revenue, r.pay_rate, r.session_count, r.teacher_pay])
     );
     toast('CSV가 다운로드되었습니다.', 'success');
   }
+
+  // 강사별 강사료 집계 CSV (지급용)
+  function exportTeacherCsv() {
+    if (!data) return;
+    downloadCsv(
+      `강사별강사료_${data.semester}_${new Date().toISOString().slice(0, 10)}.csv`,
+      ['강사', '담당강좌', '총실시회차', '강사료합계'],
+      data.byTeacher.map((t) => [t.teacher_name, t.course_count, t.session_count, t.teacher_pay])
+    );
+    toast('CSV가 다운로드되었습니다.', 'success');
+  }
+
+  const openPrint = (section: 'teacher' | 'course') => window.open(`/admin/print/finance?section=${section}`, '_blank');
 
   if (!data) return <TableSkeleton />;
   const { courses, byTeacher, totals } = data;
@@ -158,10 +194,7 @@ export default function AdminFinance() {
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={() => window.open('/admin/print/finance', '_blank')}>
-            <Icons.printer size={16} /> 강사료 보고서 인쇄
-          </button>
-          <button className="btn-secondary" onClick={exportCsv}>
-            <Icons.download size={16} /> CSV
+            <Icons.printer size={16} /> 강사료 보고서 인쇄 (전체)
           </button>
         </div>
       </div>
@@ -278,8 +311,42 @@ export default function AdminFinance() {
         })}
       </div>
 
+      {/* 차시당(회당) 강사료 일괄 적용 */}
+      <div className="mt-8 card flex flex-wrap items-end justify-between gap-3 p-5">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">차시당(회당) 강사료 일괄 적용</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            입력한 단가를 <b>전 강좌에 한 번에</b> 적용합니다. 강사료 = <b>회당 강사료 × 실시 회차</b>로 계산되어 아래 표에 반영됩니다.
+          </p>
+        </div>
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="label">회당 강사료(원)</label>
+            <input
+              type="number" min={0} step={1000} className="input w-40"
+              value={bulkRate}
+              onChange={(e) => setBulkRate(e.target.value)}
+              placeholder="예: 40000"
+            />
+          </div>
+          <button className="btn-primary" onClick={applyBulkRate} disabled={bulkSaving || bulkRate === ''}>
+            {bulkSaving ? '적용 중...' : '전 강좌 일괄 적용'}
+          </button>
+        </div>
+      </div>
+
       {/* 강사별 집계 */}
-      <h2 className="mb-3 mt-8 text-base font-bold text-slate-900">강사별 강사료 집계</h2>
+      <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-bold text-slate-900">강사별 강사료 집계</h2>
+        <div className="flex gap-2">
+          <button className="btn-secondary btn-sm" onClick={() => openPrint('teacher')}>
+            <Icons.printer size={14} /> 인쇄
+          </button>
+          <button className="btn-secondary btn-sm" onClick={exportTeacherCsv}>
+            <Icons.download size={14} /> CSV
+          </button>
+        </div>
+      </div>
       {byTeacher.length === 0 ? (
         <EmptyState message="정산할 강좌가 없습니다." />
       ) : (
@@ -310,7 +377,17 @@ export default function AdminFinance() {
       )}
 
       {/* 강좌별 강사료 */}
-      <h2 className="mb-3 mt-8 text-base font-bold text-slate-900">강좌별 강사료</h2>
+      <div className="mb-3 mt-8 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-bold text-slate-900">강좌별 강사료</h2>
+        <div className="flex gap-2">
+          <button className="btn-secondary btn-sm" onClick={() => openPrint('course')}>
+            <Icons.printer size={14} /> 인쇄
+          </button>
+          <button className="btn-secondary btn-sm" onClick={exportCsv}>
+            <Icons.download size={14} /> CSV
+          </button>
+        </div>
+      </div>
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[820px]">
@@ -372,7 +449,14 @@ export default function AdminFinance() {
                       </button>
                     )}
                   </td>
-                  <td className="td text-right font-semibold">{won(r.teacher_pay)}</td>
+                  <td className="td text-right">
+                    <div className="font-semibold">{won(r.teacher_pay)}</div>
+                    {r.pay_rate > 0 && r.session_count > 0 && (
+                      <div className="text-xs text-slate-400 [font-variant-numeric:tabular-nums]">
+                        {r.pay_rate.toLocaleString()} × {r.session_count}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {courses.length === 0 && (

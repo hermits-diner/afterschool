@@ -318,6 +318,17 @@ router.delete('/finance/calc', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// 차시당(회당) 강사료 일괄 적용 — 활성 세션의 폐강 아닌 전 강좌에 같은 단가를 설정한다.
+// (강사료 = 회당 강사료 × 실시 회차. 학교 대부분 단가가 동일해 한 번에 책정 가능)
+router.put('/finance/pay-rate', ah(async (req, res) => {
+  const parsed = z.object({ pay_rate: z.number().int().min(0).max(10_000_000) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '회당 강사료는 0 이상의 숫자여야 합니다.' });
+  const semester = (await getSettings()).semester;
+  await run("UPDATE courses SET pay_rate = ? WHERE semester = ? AND status != 'cancelled'", [parsed.data.pay_rate, semester]);
+  const updated = (await get("SELECT COUNT(*) c FROM courses WHERE semester = ? AND status != 'cancelled'", [semester])).c;
+  res.json({ ok: true, updated });
+}));
+
 // 실시 회차 수동 입력/해제 — count: 숫자면 수동값 저장, null이면 출석부 자동 집계로 복원.
 router.patch('/courses/:id/sessions', ah(async (req, res) => {
   const schema = z.object({ count: z.number().int().min(0).max(999).nullable() });
