@@ -64,7 +64,7 @@ function DateTimeField({
         />
         <input
           type="time"
-          className="input w-28"
+          className="input w-36 shrink-0"
           value={timePart}
           disabled={!datePart}
           title={datePart ? '' : '먼저 날짜를 선택하세요'}
