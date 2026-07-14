@@ -858,9 +858,10 @@ router.post('/courses/bulk', ah(async (req, res) => {
     const group = groups.find((g) => g.name === c.group.trim());
     if (!group) { skip(`교과군 '${c.group}'을 찾을 수 없음`); continue; }
 
-    // 같은 강좌명이라도 교과군(유형)이 다르면 별개 강좌로 허용 — 교과군까지 같을 때만 중복 처리
-    const dupe = await get('SELECT id FROM courses WHERE title = ? AND semester = ? AND group_id = ?', [c.title, semester.code, group.id]);
-    if (dupe) { skip('동일 교과군에 같은 강좌명이 이미 존재'); continue; }
+    // 같은 강좌명이라도 교과군(유형)이 다르면 별개 강좌로 허용 — 교과군까지 같을 때만 중복 처리.
+    // 폐강(cancelled) 강좌는 제외 — courses에 남아도 재등록을 막지 않는다. (삭제분은 휴지통이라 애초에 안 걸림)
+    const dupe = await get("SELECT id FROM courses WHERE title = ? AND semester = ? AND group_id = ? AND status != 'cancelled'", [c.title, semester.code, group.id]);
+    if (dupe) { skip('같은 교과군에 같은 강좌명이 이미 개설되어 있음 (모집중·마감)'); continue; }
 
     const slots = JSON.parse(group.schedule).sort((a, b) => DAY_ORDER[a.day] - DAY_ORDER[b.day] || a.from - b.from);
     const first = slots[0];
