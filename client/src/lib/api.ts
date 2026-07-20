@@ -121,6 +121,32 @@ export async function downloadCourseFile(courseId: number, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+// 전체 데이터 백업 JSON → 브라우저(관리자 PC)로 저장.
+// 서버리스라 서버에 보관할 곳이 없어 내려받는 방식으로 처리한다.
+export async function downloadBackup() {
+  const token = getToken();
+  const res = await fetch('/api/admin/backup', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    let message = '백업에 실패했습니다.';
+    try {
+      message = (await res.json())?.error || message;
+    } catch {
+      /* 본문이 JSON이 아니면 기본 메시지 사용 */
+    }
+    throw new ApiError(message, res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `afterschool-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, data?: unknown) =>

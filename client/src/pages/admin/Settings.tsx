@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError, CourseGroup } from '../../lib/api';
+import { api, ApiError, CourseGroup, downloadBackup } from '../../lib/api';
 import { Modal, TableSkeleton, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import PeriodPicker from '../../components/PeriodPicker';
@@ -140,6 +140,7 @@ export default function AdminSettings() {
   const [groupSaving, setGroupSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeSaving, setNoticeSaving] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   async function load() {
     const r = await api.get<{ semesters: Semester[] }>('/admin/semesters');
@@ -166,6 +167,19 @@ export default function AdminSettings() {
       toast(err instanceof ApiError ? err.message : '저장에 실패했습니다.', 'error');
     } finally {
       setNoticeSaving(false);
+    }
+  }
+
+  /* ---------- 데이터 백업 — 전체 데이터를 JSON 파일로 내려받는다 ---------- */
+  async function runBackup() {
+    setBackingUp(true);
+    try {
+      await downloadBackup();
+      toast('백업 파일을 내려받았습니다. 학교 내부 저장소에 보관하세요.', 'success');
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '백업에 실패했습니다.', 'error');
+    } finally {
+      setBackingUp(false);
     }
   }
 
@@ -545,6 +559,35 @@ export default function AdminSettings() {
               {noticeSaving ? '저장 중...' : '공지 저장'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* ---------- 데이터 백업 — 학교 데이터를 JSON 한 파일로 내려받는다 ---------- */}
+      <div className="mt-10 border-t border-slate-200 pt-8">
+        <div className="mb-4">
+          <h2 className="text-xl font-bold text-slate-900">데이터 백업</h2>
+          <p className="text-sm text-slate-500">
+            회원·강좌·수강신청·출석·정산 설정을 <b>JSON 파일 하나로</b> 내려받습니다.
+            데이터가 잘못되거나 지워졌을 때 되돌릴 근거가 되므로 <b>주 1회 이상</b> 받아 두시길 권합니다.
+          </p>
+        </div>
+        <div className="card space-y-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-slate-600">
+              파일은 <b>이 컴퓨터의 다운로드 폴더</b>에 저장됩니다.
+              <span className="ml-1 text-slate-400">(afterschool-backup-날짜.json)</span>
+            </div>
+            <button className="btn-primary" onClick={runBackup} disabled={backingUp}>
+              <Icons.download size={16} />
+              {backingUp ? '내려받는 중...' : '백업 파일 내려받기'}
+            </button>
+          </div>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            ⚠️ 학생 개인정보가 들어 있는 파일입니다. <b>학교 내부 저장소에만 보관</b>하시고 메일·메신저·외부 클라우드로 보내지 마세요.
+          </p>
+          <p className="text-xs text-slate-400">
+            비밀번호는 담기지 않습니다(복원 시 재발급). 강의계획서 첨부파일은 목록만 기록되고 파일 자체는 제외됩니다.
+          </p>
         </div>
       </div>
 

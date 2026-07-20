@@ -1080,4 +1080,47 @@ router.get('/enrollments', ah(async (req, res) => {
   res.json({ enrollments: rows });
 }));
 
+/* 전체 데이터 백업 — 학교 데이터를 JSON 한 파일로 내려받는다.
+   서버리스라 서버에 보관할 곳이 없으므로 관리자 PC로 다운로드시킨다.
+   비밀번호 해시는 담지 않는다(복원 시 재발급). 첨부파일 본문(base64)은
+   응답이 지나치게 커져 제외하고, 어떤 파일이 있었는지 목록만 남긴다. */
+router.get('/backup', ah(async (req, res) => {
+  if (!(await isSuperAdmin(req))) {
+    return res.status(403).json({ error: '시스템 관리자만 백업할 수 있습니다.' });
+  }
+
+  const users = await all('SELECT * FROM users ORDER BY id');
+  const tables = {
+    users: users.map((u) => ({ ...publicUser(u), created_at: u.created_at })),
+    semesters: await all('SELECT * FROM semesters ORDER BY code'),
+    course_groups: await all('SELECT * FROM course_groups ORDER BY id'),
+    courses: await all('SELECT * FROM courses ORDER BY id'),
+    enrollments: await all('SELECT * FROM enrollments ORDER BY id'),
+    attendance: await all('SELECT * FROM attendance ORDER BY id'),
+    announcements: await all('SELECT * FROM announcements ORDER BY id'),
+    settings: await all('SELECT * FROM settings ORDER BY key'),
+    course_files_meta: await all(
+      'SELECT course_id, filename, mime, size, uploaded_at FROM course_files ORDER BY course_id'
+    ),
+  };
+
+  const payload = {
+    meta: {
+      app: 'afterschool',
+      version: 1,
+      exported_at: new Date().toISOString(),
+      exported_by: req.user.username,
+      active_semester: (await getSettings()).semester || null,
+      counts: Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.length])),
+      note: '비밀번호 해시 미포함 — 복원 시 비밀번호는 재발급해야 합니다. 강의계획서 첨부 본문은 제외되어 목록만 담겨 있습니다.',
+    },
+    tables,
+  };
+
+  const date = new Date().toISOString().slice(0, 10);
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="afterschool-backup-${date}.json"`);
+  res.send(JSON.stringify(payload, null, 2));
+}));
+
 export default router;
