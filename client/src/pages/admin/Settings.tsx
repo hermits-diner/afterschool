@@ -79,16 +79,17 @@ function DateTimeField({
   return (
     <div>
       <label className="label">{label}</label>
-      <div className="flex gap-2">
+      {/* 좁은 칸에서도 넘치지 않도록: min-w-0로 축소 허용 + 공간 부족하면 줄바꿈 */}
+      <div className="flex flex-wrap gap-2">
         <input
           type="date"
-          className="input flex-1"
+          className="input min-w-0 flex-1 basis-40"
           value={datePart}
           onChange={(e) => onChange(e.target.value ? `${e.target.value}T${timePart}` : '')}
         />
         <input
           type="time"
-          className="input w-36 shrink-0"
+          className="input min-w-0 flex-1 basis-32"
           value={timePart}
           disabled={!datePart}
           title={datePart ? '' : '먼저 날짜를 선택하세요'}
@@ -552,7 +553,8 @@ export default function AdminSettings() {
               />
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/* 날짜+시각 두 칸이 들어가므로 한 줄에 하나씩 — 2단으로 나누면 폭이 모자라 잘린다 */}
+          <div className="grid gap-4">
             <DateTimeField
               label="신청 시작 (날짜 선택 · 기본 00:00)"
               value={form.registration_start}
