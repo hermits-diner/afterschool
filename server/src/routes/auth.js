@@ -24,8 +24,10 @@ const loginSchema = z.object({
 
 // Brute-force guard: FAIL_WINDOW 내 LOCK_THRESHOLD회 실패 시 LOCK_MINUTES 잠금.
 // DB에 기록하므로 서버리스 인스턴스가 여러 개여도 함께 적용된다.
-const LOCK_THRESHOLD = 5;
-const LOCK_MINUTES = 5;
+// 공용 PC·선착순 신청 환경을 고려해 오타에는 관대하게(10회), 잠금은 짧게(3분) —
+// 무차별 대입(온라인 추측)은 여전히 시간당 40회 수준으로 억제된다.
+const LOCK_THRESHOLD = 10;
+const LOCK_MINUTES = 3;
 const FAIL_WINDOW_MINUTES = 15;
 
 async function recordLoginFail(username, prev) {
