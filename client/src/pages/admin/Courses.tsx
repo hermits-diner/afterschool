@@ -495,11 +495,6 @@ export default function AdminCourses() {
                               <span className="font-medium text-slate-600 group-hover:text-brand-600">
                                 {c.enrolled_count}/{c.capacity}
                               </span>
-                              {(c.wish_count || 0) > 0 && (
-                                <span className="font-semibold text-amber-600" title="빈자리 희망 학생 수 — 정원 증설 판단 참고">
-                                  희망 {c.wish_count}
-                                </span>
-                              )}
                             </div>
                             <ProgressBar value={c.enrolled_count} max={c.capacity} />
                           </button>

@@ -158,13 +158,6 @@ const SCHEMA = [
     default_sessions INTEGER NOT NULL DEFAULT 16,   -- 기본 계획 차시 (강사 개설 시 자동 적용)
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
-  `CREATE TABLE IF NOT EXISTS course_wishes (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,           -- 빈자리 희망 (자동 배정 없음)
-    course_id  INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE (course_id, student_id)
-  )`,
   'CREATE INDEX IF NOT EXISTS idx_courses_semester ON courses(semester)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_student ON enrollments(student_id)',
   'CREATE INDEX IF NOT EXISTS idx_enroll_course ON enrollments(course_id)',
@@ -185,6 +178,8 @@ export async function initSchema() {
     await client.execute('PRAGMA foreign_keys = ON').catch(() => {});
   }
   await batch(SCHEMA);
+  // 빈자리 희망 기능 제거 — 정원이 차면 신청 자체가 불가하므로 희망 데이터를 보관하지 않는다.
+  await client.execute('DROP TABLE IF EXISTS course_wishes').catch(() => {});
   // Migrations for databases created before these columns existed.
   await client
     .execute('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')

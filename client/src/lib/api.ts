@@ -38,7 +38,6 @@ export interface Course {
   enrolled_count: number;
   seats_left: number;
   is_full: boolean;
-  wish_count?: number; // 빈자리 희망 인원 (관리자·강사 참고용)
   accepting?: boolean; // 강좌 소속 세션이 현재 접수 중인지 (동시 접수 지원)
   syllabus_filename?: string | null;
   schedule?: { day: string; from: number; to: number }[] | null;

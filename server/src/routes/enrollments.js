@@ -119,76 +119,14 @@ router.post('/', authRequired, requireRole('student'), ah(async (req, res) => {
   }
 
   if (!claimed) {
-    return res.status(400).json({ error: '정원이 초과되어 신청할 수 없습니다. 빈자리 희망을 등록해 두면 여석이 생겼을 때 놓치지 않고 확인할 수 있습니다.' });
+    return res.status(400).json({ error: '정원이 초과되어 신청할 수 없습니다.' });
   }
-
-  // 신청에 성공했으면 이 강좌에 남긴 빈자리 희망은 자동 정리
-  await run('DELETE FROM course_wishes WHERE course_id = ? AND student_id = ?', [course.id, student.id]);
 
   res.status(201).json({
     ok: true,
     status: 'enrolled',
     message: '수강신청이 완료되었습니다.',
   });
-}));
-
-/* ---------------- 빈자리 희망 (자동 배정 없음) ----------------
-   정원 마감 강좌에 '빈자리가 나면 신청하고 싶다'는 희망을 남긴다.
-   취소로 여석이 생겨도 자동 배정하지 않으며(선착순 원칙), 학생이 직접 재신청한다.
-   관리자는 강좌별 희망 인원을 보고 증설·정원 조정을 판단한다. */
-
-// 내 희망 목록 (활성 + 접수중 세션)
-router.get('/wishes/mine', authRequired, requireRole('student'), ah(async (req, res) => {
-  const codes = await getStudentVisibleSemesters();
-  const ph = codes.map(() => '?').join(',');
-  const rows = await all(
-    `SELECT w.course_id FROM course_wishes w JOIN courses c ON c.id = w.course_id
-     WHERE w.student_id = ? AND c.semester IN (${ph})`,
-    [req.user.id, ...codes]
-  );
-  res.json({ course_ids: rows.map((r) => r.course_id) });
-}));
-
-// 희망 등록 — 정원이 남아 있으면 바로 신청하라고 안내
-router.post('/wishes', authRequired, requireRole('student'), ah(async (req, res) => {
-  const schema = z.object({ course_id: z.number().int() });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: '강좌를 선택하세요.' });
-  const course = await get('SELECT * FROM courses WHERE id = ?', [parsed.data.course_id]);
-  if (!course || course.status !== 'open') {
-    return res.status(400).json({ error: '희망을 등록할 수 없는 강좌입니다.' });
-  }
-  // 강좌가 속한 세션이 접수 중일 때만 희망 등록 가능
-  const semester = await get('SELECT * FROM semesters WHERE code = ?', [course.semester]);
-  if (!isSemesterAccepting(semester)) {
-    return res.status(403).json({ error: '이 강좌의 세션은 현재 수강신청 기간이 아닙니다.' });
-  }
-  const enrolled = await get(
-    "SELECT id FROM enrollments WHERE student_id = ? AND course_id = ? AND status = 'enrolled'",
-    [req.user.id, course.id]
-  );
-  if (enrolled) return res.status(400).json({ error: '이미 신청한 강좌입니다.' });
-  const seats = await get(
-    "SELECT COUNT(*) c FROM enrollments WHERE course_id = ? AND status = 'enrolled'",
-    [course.id]
-  );
-  if (seats.c < course.capacity) {
-    return res.status(400).json({ error: '빈자리가 있습니다. 바로 신청하세요!' });
-  }
-  await run('INSERT OR IGNORE INTO course_wishes (course_id, student_id) VALUES (?, ?)', [
-    course.id,
-    req.user.id,
-  ]);
-  res.status(201).json({ ok: true, message: '빈자리 희망이 등록되었습니다. 여석이 생기면 이 화면에 표시됩니다.' });
-}));
-
-// 희망 취소
-router.delete('/wishes/:courseId', authRequired, requireRole('student'), ah(async (req, res) => {
-  await run('DELETE FROM course_wishes WHERE course_id = ? AND student_id = ?', [
-    req.params.courseId,
-    req.user.id,
-  ]);
-  res.json({ ok: true });
 }));
 
 // Student: cancel enrollment
