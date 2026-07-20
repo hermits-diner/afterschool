@@ -74,6 +74,9 @@ export default function AdminCourses() {
   const [syllabusFile, setSyllabusFile] = useState<File | null>(null);
   const [rosterCourse, setRosterCourse] = useState<Course | null>(null);
   const [roster, setRoster] = useState<any[]>([]);
+  const [addQ, setAddQ] = useState('');           // 관리자 대리 신청 — 학생 검색어
+  const [addResults, setAddResults] = useState<User[]>([]);
+  const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
@@ -353,6 +356,8 @@ export default function AdminCourses() {
 
   async function openRoster(c: Course) {
     setRosterCourse(c);
+    setAddQ('');
+    setAddResults([]);
     const r = await api.get<{ roster: any[] }>(`/admin/courses/${c.id}/roster`);
     setRoster(r.roster);
   }
@@ -361,6 +366,44 @@ export default function AdminCourses() {
     await api.del(`/admin/enrollments/${enrollmentId}`);
     if (rosterCourse) openRoster(rosterCourse);
     load();
+  }
+
+  /* ---------- 관리자 대리 신청 — 이름/학번으로 찾아 이 강좌에 직접 추가 ---------- */
+  async function searchStudents(q: string) {
+    setAddQ(q);
+    if (!q.trim()) return setAddResults([]);
+    const r = await api.get<{ users: User[] }>(`/admin/users?role=student&q=${encodeURIComponent(q.trim())}`);
+    const already = new Set(roster.map((x) => x.student_id));
+    setAddResults(r.users.filter((u) => !already.has(u.id)).slice(0, 8));
+  }
+
+  async function addToRoster(student: User, force = false) {
+    if (!rosterCourse) return;
+    setAdding(true);
+    try {
+      const r = await api.post<{ message: string }>('/admin/enrollments', {
+        course_id: rosterCourse.id,
+        student_id: student.id,
+        force,
+      });
+      toast(r.message, 'success');
+      setAddQ('');
+      setAddResults([]);
+      openRoster(rosterCourse);
+      load();
+    } catch (err) {
+      // 409 = 정원 초과 — 관리자가 확인했을 때만 초과 배정
+      if (err instanceof ApiError && err.status === 409) {
+        setAdding(false);
+        if (confirm(`${err.message}\n\n${student.name} 학생을 그래도 추가하시겠습니까?\n정원을 초과해 배정됩니다.`)) {
+          return addToRoster(student, true);
+        }
+        return;
+      }
+      toast(err instanceof ApiError ? err.message : '추가에 실패했습니다.', 'error');
+    } finally {
+      setAdding(false);
+    }
   }
 
   if (!courses) {
@@ -819,6 +862,48 @@ export default function AdminCourses() {
 
       {/* Roster modal */}
       <Modal open={!!rosterCourse} onClose={() => setRosterCourse(null)} title={`수강생 명단 · ${rosterCourse?.title || ''}`} size="lg">
+        {/* 관리자 대리 신청 — 신청 기간이 아니어도 추가 가능 */}
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-slate-700">학생 직접 추가</span>
+            {rosterCourse && (
+              <span className={`text-xs font-medium ${roster.length >= rosterCourse.capacity ? 'text-rose-600' : 'text-slate-500'}`}>
+                정원 {roster.length}/{rosterCourse.capacity}
+                {roster.length >= rosterCourse.capacity && ' · 초과 배정 시 확인'}
+              </span>
+            )}
+          </div>
+          <input
+            className="input"
+            placeholder="학생 이름 또는 아이디로 검색 (예: 홍길동, 20261101)"
+            value={addQ}
+            onChange={(e) => searchStudents(e.target.value)}
+          />
+          {addResults.length > 0 && (
+            <div className="mt-2 max-h-44 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+              {addResults.map((u) => (
+                <div key={u.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <span className="text-sm">
+                    <b className="text-slate-800">{u.name}</b>
+                    <span className="ml-2 text-slate-500">
+                      {studentLabel(u.grade ?? 0, u.class_no ?? 0, u.student_no ?? 0)}
+                    </span>
+                  </span>
+                  <button className="btn-primary btn-sm" disabled={adding} onClick={() => addToRoster(u)}>
+                    추가
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {addQ.trim() !== '' && addResults.length === 0 && (
+            <p className="mt-2 text-xs text-slate-400">검색 결과가 없습니다. (이미 이 강좌를 신청한 학생은 제외됩니다)</p>
+          )}
+          <p className="mt-2 text-xs text-slate-400">
+            신청 기간이 아니어도 추가할 수 있습니다. 대상 학년 · 1인 최대 과목 수 · 시간표 중복은 확인합니다.
+          </p>
+        </div>
+
         {roster.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-400">신청한 학생이 없습니다.</p>
         ) : (

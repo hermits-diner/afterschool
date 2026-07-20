@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, batch, getSettings, setSetting, semesterName } from '../db.js';
 import { authRequired, requireRole, hashPassword, ah } from '../auth.js';
-import { publicUser, decorateCourses, getCourseRoster, getActiveSemester, trashCourses, restoreTrashedCourse, purgeTrashedCourses, PERIOD_TIMES } from '../logic.js';
+import { publicUser, decorateCourses, getCourseRoster, getActiveSemester, trashCourses, restoreTrashedCourse, purgeTrashedCourses, findScheduleConflict, parseTargetGrades, scheduleLabel, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -980,6 +980,89 @@ router.delete('/enrollments/:id', ah(async (req, res) => {
   if (!enrollment) return res.status(404).json({ error: '신청 내역을 찾을 수 없습니다.' });
   await run("UPDATE enrollments SET status='cancelled' WHERE id = ?", [enrollment.id]);
   res.json({ ok: true });
+}));
+
+/* 관리자 대리 신청 — 학생을 강좌에 직접 추가한다.
+   신청 기간은 무시하되(마감 후에도 추가 가능) 학년 제한·1인 최대 과목 수·시간표 중복은 그대로 검사한다.
+   정원 초과는 막지 않고 409로 되돌려, 관리자가 확인(force)했을 때만 넣는다. */
+router.post('/enrollments', ah(async (req, res) => {
+  const schema = z.object({
+    course_id: z.number().int(),
+    student_id: z.number().int(),
+    force: z.boolean().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: '강좌와 학생을 선택하세요.' });
+  const { course_id, student_id, force } = parsed.data;
+
+  const course = await get('SELECT * FROM courses WHERE id = ?', [course_id]);
+  if (!course) return res.status(404).json({ error: '강좌를 찾을 수 없습니다.' });
+  if (course.status === 'cancelled') {
+    return res.status(400).json({ error: '폐강된 강좌에는 추가할 수 없습니다.' });
+  }
+
+  const student = await get("SELECT * FROM users WHERE id = ? AND role = 'student'", [student_id]);
+  if (!student) return res.status(404).json({ error: '학생을 찾을 수 없습니다.' });
+  if (!student.active) return res.status(400).json({ error: '비활성 학생은 추가할 수 없습니다.' });
+
+  // 취소된 행은 아래에서 되살린다 (UNIQUE 제약)
+  const existing = await get(
+    'SELECT * FROM enrollments WHERE student_id = ? AND course_id = ?',
+    [student.id, course.id]
+  );
+  if (existing && existing.status !== 'cancelled') {
+    return res.status(400).json({ error: '이미 이 강좌를 신청한 학생입니다.' });
+  }
+
+  const targetGrades = parseTargetGrades(course);
+  if (targetGrades.length && !targetGrades.includes(student.grade)) {
+    return res.status(400).json({ error: `${targetGrades.join('·')}학년 대상 강좌입니다.` });
+  }
+
+  // 1인 최대 과목 수 — 강좌가 속한 세션 기준. 폐강 강좌 신청분은 제외.
+  const semester = await get('SELECT * FROM semesters WHERE code = ?', [course.semester]);
+  const max = Number(semester?.max_courses_per_student || 3);
+  const activeRow = await get(
+    `SELECT COUNT(*) AS c FROM enrollments e JOIN courses c ON c.id = e.course_id
+     WHERE e.student_id = ? AND e.status = 'enrolled'
+       AND c.status != 'cancelled' AND c.semester = ?`,
+    [student.id, course.semester]
+  );
+  if (activeRow.c >= max) {
+    return res.status(400).json({ error: `이 학생은 이미 최대 ${max}과목을 신청했습니다.` });
+  }
+
+  const conflict = await findScheduleConflict(student.id, course);
+  if (conflict) {
+    return res.status(400).json({ error: `시간표가 겹칩니다: ${conflict.title} (${scheduleLabel(conflict)})` });
+  }
+
+  const seats = await get(
+    "SELECT COUNT(*) AS c FROM enrollments WHERE course_id = ? AND status = 'enrolled'",
+    [course.id]
+  );
+  const overCapacity = seats.c >= course.capacity;
+  if (overCapacity && !force) {
+    // 409 = 정원 초과 확인 필요 (클라이언트가 이 상태코드로 재확인 후 force 재요청)
+    return res.status(409).json({ error: `정원이 찼습니다 (${seats.c}/${course.capacity}).` });
+  }
+
+  if (existing) {
+    await run("UPDATE enrollments SET status = 'enrolled', created_at = datetime('now') WHERE id = ?", [existing.id]);
+  } else {
+    await run("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'enrolled')", [
+      student.id,
+      course.id,
+    ]);
+  }
+
+  res.status(201).json({
+    ok: true,
+    over_capacity: overCapacity,
+    message: overCapacity
+      ? `${student.name} 학생을 추가했습니다. 정원을 초과했습니다 (${seats.c + 1}/${course.capacity}).`
+      : `${student.name} 학생을 추가했습니다.`,
+  });
 }));
 
 // All enrollments overview (with student + course)
