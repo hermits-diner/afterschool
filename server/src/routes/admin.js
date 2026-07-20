@@ -602,7 +602,20 @@ router.get('/users', ah(async (req, res) => {
     `SELECT * FROM users ${where} ORDER BY role, grade, class_no, student_no, name`,
     params
   );
-  res.json({ users: rows.map(publicUser) });
+  // 로그인 잠금 상태 — locked_until이 현재보다 미래인 계정 (ISO 문자열 비교, 둘 다 UTC)
+  const lockedRows = await all('SELECT username FROM login_attempts WHERE locked_until IS NOT NULL AND locked_until > ?', [
+    new Date().toISOString(),
+  ]);
+  const lockedSet = new Set(lockedRows.map((r) => r.username));
+  res.json({ users: rows.map((u) => ({ ...publicUser(u), locked: lockedSet.has(u.username) })) });
+}));
+
+// 로그인 잠금 해제 — 해당 계정의 실패 기록을 삭제해 즉시 다시 로그인할 수 있게 한다.
+router.post('/users/:id/unlock', ah(async (req, res) => {
+  const u = await get('SELECT username FROM users WHERE id = ?', [req.params.id]);
+  if (!u) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  await run('DELETE FROM login_attempts WHERE username = ?', [u.username]);
+  res.json({ ok: true });
 }));
 
 const userSchema = z.object({

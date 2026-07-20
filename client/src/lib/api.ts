@@ -14,6 +14,7 @@ export interface User {
   active?: boolean;
   is_super?: boolean; // 시스템 관리자 (부관리자 관리 권한)
   must_change_password?: boolean;
+  locked?: boolean; // 로그인 실패 누적으로 잠긴 상태
 }
 
 export interface Course {

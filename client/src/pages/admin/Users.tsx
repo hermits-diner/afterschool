@@ -219,6 +219,17 @@ export default function AdminUsers() {
     load();
   }
 
+  // 로그인 잠금 해제 — 실패 누적으로 잠긴 계정을 즉시 풀어준다.
+  async function unlock(u: User) {
+    try {
+      await api.post(`/admin/users/${u.id}/unlock`);
+      toast(`${u.name} 계정의 로그인 잠금을 해제했습니다.`, 'success');
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '잠금 해제에 실패했습니다.', 'error');
+    }
+  }
+
   async function remove(u: User) {
     if (!confirm(`'${u.name}' 회원을 삭제하시겠습니까?`)) return;
     try {
@@ -332,9 +343,15 @@ export default function AdminUsers() {
                       <span className={`badge ${u.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
                         {u.active ? '활성' : '비활성'}
                       </span>
+                      {u.locked && (
+                        <span className="badge ml-1 bg-rose-100 text-rose-600" title="로그인 실패가 많아 일시 잠긴 상태입니다">🔒 잠김</span>
+                      )}
                     </td>
                     <td className="td">
                       <div className="flex justify-end gap-1">
+                        {u.locked && (
+                          <button className="btn-ghost btn-sm text-brand-600" onClick={() => unlock(u)}>잠금 해제</button>
+                        )}
                         <button className="btn-ghost btn-sm" onClick={() => openEdit(u)}>수정</button>
                         {/* 시스템 관리자 계정은 비활성화·삭제 불가 */}
                         {!u.is_super && (
