@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { all, get, run, getSetting } from '../db.js';
 import { authRequired, requireRole, ah } from '../auth.js';
-import { decorateCourse, decorateCourses, getActiveSemester, getAcceptingSemesters, getStudentVisibleSemesters, trashCourses, PERIOD_TIMES } from '../logic.js';
+import { decorateCourse, decorateCourses, forViewer, getActiveSemester, getAcceptingSemesters, getStudentVisibleSemesters, trashCourses, PERIOD_TIMES } from '../logic.js';
 
 const router = Router();
 
@@ -54,7 +54,8 @@ router.get('/', authRequired, ah(async (req, res) => {
   );
   // 강좌별 접수 가능 여부(소속 세션 기준) — 클라이언트가 신청 버튼 활성화에 사용
   const acceptingCodes = new Set((await getAcceptingSemesters()).map((s) => s.code));
-  const decorated = await decorateCourses(rows);
+  // 학생 응답에서는 강사료 등 운영 필드를 제거한다.
+  const decorated = forViewer(await decorateCourses(rows), req.user.role);
   res.json({ courses: decorated.map((c) => ({ ...c, accepting: acceptingCodes.has(c.semester) })) });
 }));
 
@@ -69,7 +70,8 @@ router.get('/:id', authRequired, ah(async (req, res) => {
     'SELECT * FROM announcements WHERE course_id = ? ORDER BY created_at DESC',
     [course.id]
   );
-  res.json({ course: await decorateCourse(course), announcements });
+  const [decoratedCourse] = forViewer([await decorateCourse(course)], req.user.role);
+  res.json({ course: decoratedCourse, announcements });
 }));
 
 const DAYS = ['월', '화', '수', '목', '금'];

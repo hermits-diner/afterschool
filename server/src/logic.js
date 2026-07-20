@@ -336,6 +336,22 @@ export async function decorateCourses(courses) {
   });
 }
 
+// 학생에게 내보내면 안 되는 운영·정산 필드 (강사료 단가 등).
+// decorateCourses가 강좌 행을 통째로 펼치므로 응답 직전에 걸러낸다.
+const STAFF_ONLY_FIELDS = ['pay_rate', 'session_override', 'planned_sessions'];
+
+// 조회자 역할에 맞게 민감 필드를 제거한다. 학생 응답에만 적용되고
+// 강사·관리자 경로(정산 화면 등)는 그대로 통과시킨다.
+// 수강료(fee)는 학생 본인이 부담하는 금액이라 남긴다.
+export function forViewer(courses, role) {
+  if (role !== 'student') return courses;
+  return courses.map((c) => {
+    const out = { ...c };
+    for (const k of STAFF_ONLY_FIELDS) delete out[k];
+    return out;
+  });
+}
+
 export async function decorateCourse(course) {
   if (!course) return course;
   return (await decorateCourses([course]))[0];

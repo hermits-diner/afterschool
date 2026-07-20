@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, Course } from '../../lib/api';
+import { api, ApiError, Course } from '../../lib/api';
 import { Spinner, EmptyState } from '../../components/ui';
 import { Icons } from '../../components/icons';
 import { courseDisplayTitle, studentShort } from '../../lib/format';
@@ -63,6 +63,9 @@ export default function TeacherAttendance() {
     try {
       await api.post(`/teacher/courses/${selected}/attendance`, { date, records });
       toast(`${date} 출석이 저장되었습니다.`, 'success');
+    } catch (err) {
+      // 저장 실패를 알리지 않으면 교사가 기록된 줄 알고 넘어간다
+      toast(err instanceof ApiError ? err.message : '출석 저장에 실패했습니다. 다시 시도해 주세요.', 'error');
     } finally {
       setSaving(false);
     }

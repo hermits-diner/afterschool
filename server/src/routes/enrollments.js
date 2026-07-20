@@ -6,6 +6,7 @@ import {
   findScheduleConflict,
   isSemesterAccepting,
   decorateCourses,
+  forViewer,
   getStudentVisibleSemesters,
   parseTargetGrades,
   scheduleLabel,
@@ -26,7 +27,8 @@ router.get('/mine', authRequired, requireRole('student'), ah(async (req, res) =>
      ORDER BY c.day_of_week, c.start_time`,
     [req.user.id, ...codes]
   );
-  const decorated = await decorateCourses(rows);
+  // 학생 전용 라우트 — 강사료 등 운영 필드 제거
+  const decorated = forViewer(await decorateCourses(rows), 'student');
   const courses = decorated.map((r, i) => ({
     enrollment_id: rows[i].enrollment_id,
     enrollment_status: rows[i].enrollment_status,

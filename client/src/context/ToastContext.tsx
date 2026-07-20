@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import { ApiError } from '../lib/api';
 
 type ToastType = 'success' | 'error' | 'info';
 interface Toast {
@@ -21,6 +22,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t, { id, type, message }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
+
+  // 어디서도 catch하지 않은 API 실패를 마지막에 잡아 사용자에게 알린다.
+  // catch된 요청은 애초에 unhandledrejection이 아니므로 기존 토스트와 중복되지 않는다.
+  useEffect(() => {
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      if (e.reason instanceof ApiError) {
+        toast(e.reason.message, 'error');
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', onUnhandled);
+    return () => window.removeEventListener('unhandledrejection', onUnhandled);
+  }, [toast]);
 
   const styles: Record<ToastType, string> = {
     success: 'bg-emerald-600',

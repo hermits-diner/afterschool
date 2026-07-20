@@ -362,10 +362,16 @@ export default function AdminCourses() {
     setRoster(r.roster);
   }
 
-  async function removeFromRoster(enrollmentId: number) {
-    await api.del(`/admin/enrollments/${enrollmentId}`);
-    if (rosterCourse) openRoster(rosterCourse);
-    load();
+  async function removeFromRoster(r: { enrollment_id: number; name: string }) {
+    if (!confirm(`${r.name} 학생의 수강신청을 취소하시겠습니까?\n이 자리는 다른 학생이 신청할 수 있게 됩니다.`)) return;
+    try {
+      await api.del(`/admin/enrollments/${r.enrollment_id}`);
+      toast(`${r.name} 학생을 제외했습니다.`, 'success');
+      if (rosterCourse) openRoster(rosterCourse);
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '제외에 실패했습니다.', 'error');
+    }
   }
 
   /* ---------- 관리자 대리 신청 — 이름/학번으로 찾아 이 강좌에 직접 추가 ---------- */
@@ -926,7 +932,7 @@ export default function AdminCourses() {
                     <td className="td">{studentLabel(r.grade, r.class_no, r.student_no)}</td>
                     <td className="td"><EnrollBadge status={r.status} /></td>
                     <td className="td text-right">
-                      <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeFromRoster(r.enrollment_id)}>제외</button>
+                      <button className="btn-ghost btn-sm text-rose-600" onClick={() => removeFromRoster(r)}>제외</button>
                     </td>
                   </tr>
                 ))}
