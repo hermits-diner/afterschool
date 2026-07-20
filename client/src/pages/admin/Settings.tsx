@@ -63,6 +63,10 @@ function regProgress(s: Semester): { pct: number; label: string; tone: keyof typ
 
 // 날짜 + 시각 분리 입력: 날짜는 date 피커로, 시각은 기본값(시작 00:00 / 종료 23:59)으로 미리 채워
 // 대부분 날짜만 고르면 되고, 필요할 때만 시각을 조정. 값은 'YYYY-MM-DDTHH:MM' 문자열로 합쳐 전달.
+// 시각 표기는 24시간제로 통일 (브라우저 기본 time 입력은 로케일에 따라 '오전 12:00'으로 보인다)
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
+
 function DateTimeField({
   label,
   value,
@@ -76,6 +80,9 @@ function DateTimeField({
 }) {
   const [datePart, timePartRaw] = value ? value.split('T') : ['', ''];
   const timePart = timePartRaw ? timePartRaw.slice(0, 5) : defaultTime;
+  const [hh, mm] = timePart.split(':');
+  const setTime = (h: string, m: string) => onChange(datePart ? `${datePart}T${h}:${m}` : '');
+  const lockHint = datePart ? '' : '먼저 날짜를 선택하세요';
   return (
     <div>
       <label className="label">{label}</label>
@@ -87,14 +94,34 @@ function DateTimeField({
           value={datePart}
           onChange={(e) => onChange(e.target.value ? `${e.target.value}T${timePart}` : '')}
         />
-        <input
-          type="time"
-          className="input min-w-0 flex-1 basis-32"
-          value={timePart}
-          disabled={!datePart}
-          title={datePart ? '' : '먼저 날짜를 선택하세요'}
-          onChange={(e) => onChange(datePart ? `${datePart}T${e.target.value || defaultTime}` : '')}
-        />
+        {/* 시:분 직접 선택 — 24시간제 표기 고정 */}
+        <div className="flex min-w-0 flex-1 basis-32 items-center gap-1.5">
+          <select
+            className="input min-w-0 flex-1 px-2"
+            value={hh}
+            disabled={!datePart}
+            title={lockHint}
+            aria-label="시"
+            onChange={(e) => setTime(e.target.value, mm)}
+          >
+            {HOURS.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+          <span className="font-semibold text-slate-400">:</span>
+          <select
+            className="input min-w-0 flex-1 px-2"
+            value={mm}
+            disabled={!datePart}
+            title={lockHint}
+            aria-label="분"
+            onChange={(e) => setTime(hh, e.target.value)}
+          >
+            {MINUTES.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
       </div>
     </div>
   );
