@@ -72,6 +72,8 @@ const studentNav: NavItem[] = [
   { to: '/student/catalog', label: '강좌 신청', icon: <Icons.book /> },
   { to: '/student/my', label: '내 수강신청', icon: <Icons.clipboard /> },
   { to: '/student/timetable', label: '내 시간표', icon: <Icons.calendar /> },
+  // 모바일에서도 접근 가능하도록 사이드바에 노출 (헤더 링크는 모바일에서 숨겨짐)
+  { to: '/student/settings/password', label: '비밀번호 변경', icon: <Icons.key /> },
 ];
 
 function RoleLayout({ nav }: { nav: NavItem[] }) {
