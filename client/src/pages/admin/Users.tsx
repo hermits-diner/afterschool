@@ -230,6 +230,18 @@ export default function AdminUsers() {
     }
   }
 
+  // 비밀번호 초기화 — 임시 비번을 아이디(학번)로. 학생은 이 값으로 로그인 후 새 비번을 정한다.
+  async function resetPassword(u: User) {
+    if (!confirm(`'${u.name}' 계정의 비밀번호를 아이디(${u.username})로 초기화하시겠습니까?\n\n학생에게 "아이디와 같은 비밀번호로 로그인하라"고 안내하시면 되고, 로그인하면 새 비밀번호를 정하게 됩니다.`)) return;
+    try {
+      await api.post<{ username: string }>(`/admin/users/${u.id}/reset-password`);
+      toast(`비밀번호를 초기화했습니다. 임시 비밀번호 = 아이디(${u.username})`, 'success');
+      load();
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : '초기화에 실패했습니다.', 'error');
+    }
+  }
+
   async function remove(u: User) {
     if (!confirm(`'${u.name}' 회원을 삭제하시겠습니까?`)) return;
     try {
@@ -353,6 +365,11 @@ export default function AdminUsers() {
                           <button className="btn-ghost btn-sm text-brand-600" onClick={() => unlock(u)}>잠금 해제</button>
                         )}
                         <button className="btn-ghost btn-sm" onClick={() => openEdit(u)}>수정</button>
+                        {tab !== 'admin' && (
+                          <button className="btn-ghost btn-sm text-brand-600" onClick={() => resetPassword(u)} title="임시 비밀번호를 아이디(학번)로 초기화">
+                            비번 초기화
+                          </button>
+                        )}
                         {/* 시스템 관리자 계정은 비활성화·삭제 불가 */}
                         {!u.is_super && (
                           <>

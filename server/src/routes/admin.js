@@ -618,6 +618,17 @@ router.post('/users/:id/unlock', ah(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// 비밀번호 초기화 — 임시 비번을 아이디(학번)로 설정하고 다음 로그인 시 변경을 강제한다.
+// 관리자가 학생 비번을 몰라도 도와줄 수 있게 하되, 임시 비번은 학생이 곧바로 바꾼다. 잠금도 함께 해제.
+router.post('/users/:id/reset-password', ah(async (req, res) => {
+  const u = await get('SELECT * FROM users WHERE id = ?', [req.params.id]);
+  if (!u) return res.status(404).json({ error: '사용자를 찾을 수 없습니다.' });
+  if (u.is_super) return res.status(403).json({ error: '시스템 관리자 계정은 초기화할 수 없습니다.' });
+  await run('UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?', [hashPassword(u.username), u.id]);
+  await run('DELETE FROM login_attempts WHERE username = ?', [u.username]);
+  res.json({ ok: true, username: u.username });
+}));
+
 const userSchema = z.object({
   username: z.string().min(3, '아이디는 3자 이상이어야 합니다.'),
   password: z.string().min(4, '비밀번호는 4자 이상이어야 합니다.'),
