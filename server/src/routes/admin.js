@@ -863,6 +863,8 @@ router.post('/courses/bulk', ah(async (req, res) => {
           target_grades: z.array(z.number().int().min(1).max(3)).max(3).optional(),
           fee: z.number().int().min(0).optional(),
           pay_rate: z.number().int().min(0).optional(),
+          textbook: z.string().max(100).optional(), // 부교재명 (빈값 = 자체제작)
+          description: z.string().max(2000).optional(),
         })
       )
       .min(1)
@@ -911,16 +913,18 @@ router.post('/courses/bulk', ah(async (req, res) => {
     const allGrades = gradeArr.length === 0 || gradeArr.length >= 3;
     await run(
       `INSERT INTO courses
-       (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
-       VALUES (?, ?, '', ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+       (title, category, description, teacher_id, capacity, day_of_week, start_time, end_time, room, textbook, target_grade, target_grades, fee, pay_rate, planned_sessions, schedule, group_id, status, semester)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
       [
         c.title,
         c.category || '기타',
+        c.description ?? '',
         teacherId,
         c.capacity ?? 20,
         first.day,
         PERIOD_TIMES[first.from][0],
         PERIOD_TIMES[first.to][1],
+        c.textbook ?? '',
         !allGrades && gradeArr.length === 1 ? gradeArr[0] : 0,
         allGrades ? '' : gradeArr.join(','),
         c.fee ?? 0,

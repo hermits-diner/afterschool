@@ -45,7 +45,46 @@ type BulkCourseRow = {
   target_grades?: number[];
   fee?: number;
   pay_rate?: number;
+  textbook?: string;
+  description?: string;
 };
+
+// 일괄 등록 열 정의 — key는 서버 필드, aliases는 양식 헤더 인식용(공백 제거 후 비교).
+type BulkColKey = 'grades' | 'group' | 'title' | 'teacher' | 'category' | 'capacity' | 'pay_rate' | 'textbook' | 'description';
+const BULK_COL_ALIASES: Record<BulkColKey, string[]> = {
+  grades: ['학년', '대상학년'],
+  group: ['교과군', '유형'],
+  title: ['강좌명'],
+  teacher: ['강사', '강사명', '담당강사'],
+  category: ['교과'],
+  capacity: ['정원'],
+  pay_rate: ['회당강사료', '강사료'],
+  textbook: ['부교재', '부교재명', '교재'],
+  description: ['강좌소개', '소개', '설명'],
+};
+// 헤더 없이 붙여넣을 때의 기본 열 순서 (강좌 관리 목록과 동일, 뒤쪽은 생략 가능)
+const BULK_DEFAULT_ORDER: (BulkColKey | null)[] = ['grades', 'group', 'title', 'teacher', 'category', 'capacity', 'pay_rate', 'textbook', 'description'];
+
+// 한 줄 분해: 탭(엑셀 붙여넣기) 우선, 없으면 쉼표. 쉼표 모드는 따옴표 묶음(쉼표 포함 소개글)을 지원한다.
+function splitBulkLine(line: string): string[] {
+  if (line.includes('\t')) return line.split('\t').map((p) => p.trim());
+  const parts: string[] = [];
+  let cur = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuote) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuote = false;
+      } else cur += ch;
+    } else if (ch === '"' && cur.trim() === '') { cur = ''; inQuote = true; }
+    else if (ch === ',') { parts.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  parts.push(cur.trim());
+  return parts;
+}
 
 const emptyForm: Form = {
   title: '',
@@ -113,17 +152,28 @@ export default function AdminCourses() {
   const bulkRows = useMemo<{ rows: BulkCourseRow[]; errors: string[] }>(() => {
     const rows: BulkCourseRow[] = [];
     const errors: string[] = [];
+    // 열 순서 — 기본은 강좌 관리 목록과 동일. 양식 헤더 줄(강좌명 포함)을 만나면 그 순서를 따른다.
+    let order = BULK_DEFAULT_ORDER;
     bulkText
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
       .forEach((line, idx) => {
-        // 탭(엑셀 붙여넣기) 우선, 없으면 쉼표 구분. '-' 또는 빈칸 = 생략.
-        const parts = (line.includes('\t') ? line.split('\t') : line.split(','))
-          .map((p) => p.trim())
-          .map((p) => (p === '-' ? '' : p));
-        // 열 순서: 강좌 관리 목록과 동일 — 학년, 교과군, 강좌명, 강사, 교과, 정원, [회당강사료]
-        const [grades, group, title, teacher, category, capacity, payRate] = parts;
+        const rawParts = splitBulkLine(line);
+        // 헤더 줄 감지: '강좌명' 열이 있으면 헤더로 보고 열 배치를 갱신 (양식 CSV 붙여넣기 지원)
+        const norm = (s: string) => s.replace(/[\s[\]()*]/g, '');
+        if (rawParts.some((p) => norm(p) === '강좌명')) {
+          order = rawParts.map((p) => {
+            const n = norm(p);
+            return (Object.keys(BULK_COL_ALIASES) as BulkColKey[]).find((k) => BULK_COL_ALIASES[k].includes(n)) ?? null;
+          });
+          return;
+        }
+        // '-' 또는 빈칸 = 생략
+        const parts = rawParts.map((p) => (p === '-' ? '' : p));
+        const cell: Partial<Record<BulkColKey, string>> = {};
+        order.forEach((k, i) => { if (k && parts[i]) cell[k] = parts[i]; });
+        const { grades, group, title, teacher, category, capacity, pay_rate: payRate, textbook, description } = cell;
         const err = (msg: string) => errors.push(`${idx + 1}행: ${msg}`);
         if (!title) return err('강좌명이 없습니다.');
         if (!group) return err(`'${title}' — 교과군이 없습니다.`);
@@ -146,10 +196,29 @@ export default function AdminCourses() {
           capacity: num(capacity, '정원'),
           target_grades,
           pay_rate: num(payRate, '회당 강사료'),
+          textbook: textbook || undefined,
+          description: description || undefined,
         });
       });
     return { rows, errors };
   }, [bulkText]);
+
+  // 일괄 등록 양식(CSV) 다운로드 — 엑셀에서 바로 열리도록 BOM 포함
+  function downloadBulkTemplate() {
+    const lines = [
+      ['학년', '교과군', '강좌명', '강사', '교과', '정원', '회당강사료', '부교재', '강좌소개'],
+      ['12', 'A유형', '문학의 밤', '김국어', '국어', '20', '30000', '문학과 함께', '문학 작품을 읽고 함께 토론합니다.'],
+      ['-', 'B유형', '방송댄스', '-', '기타', '25', '-', '자체제작', '-'],
+    ];
+    const esc = (c: string) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c);
+    const csv = String.fromCharCode(0xfeff) + lines.map((r) => r.map(esc).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '강좌 일괄등록 양식.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function submitBulk() {
     if (bulkRows.rows.length === 0) return toast('등록할 강좌가 없습니다.', 'error');
@@ -678,14 +747,18 @@ export default function AdminCourses() {
         ) : (
           <div className="space-y-4">
             <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              한 줄에 한 강좌씩 <b>학년, 교과군, 강좌명, 강사, 교과, 정원, [회당강사료]</b> 순서로 입력하세요.
+              한 줄에 한 강좌씩 <b>학년, 교과군, 강좌명, 강사, 교과, 정원, [회당강사료], [부교재], [강좌소개]</b> 순서로 입력하세요.
               쉼표 또는 탭(엑셀 붙여넣기) 구분이며, 생략할 항목은 <b>-</b>로 채웁니다.
               <br />학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 <b>-</b>는 전학년, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b>,
               강사는 <b>아이디 또는 이름</b>으로 적습니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
+              <br />아래 <b>양식</b>을 내려받아 엑셀에서 작성한 뒤 그대로 붙여넣어도 됩니다 — 제목 줄이 있으면 열 순서를 자동으로 인식합니다.
               <div className="mt-1 font-mono text-xs text-slate-500">
                 12, A유형, 문학의 밤, 김국어, 국어, 20<br />
                 -, B유형, 방송댄스, -, 기타, 25 <span className="text-slate-400">← 전학년 · 강사 미배정</span>
               </div>
+              <button type="button" className="btn-secondary btn-sm mt-2 inline-flex items-center gap-1.5" onClick={downloadBulkTemplate}>
+                <Icons.download size={14} /> 양식 다운로드
+              </button>
             </div>
             <textarea
               className="input min-h-[160px] font-mono text-sm"
