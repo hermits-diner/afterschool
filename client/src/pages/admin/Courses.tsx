@@ -172,6 +172,9 @@ export default function AdminCourses() {
         }
         // '-' 또는 빈칸 = 생략
         const parts = rawParts.map((p) => (p === '-' ? '' : p));
+        // 시트 제목 줄(예: '강좌 일괄등록 양식 — 3학년')이 중간에 섞여 붙어도 무시
+        const nonEmpty = parts.filter(Boolean);
+        if (nonEmpty.length === 1 && /양식|일괄\s*등록/.test(nonEmpty[0])) return;
         const cell: Partial<Record<BulkColKey, string>> = {};
         order.forEach((k, i) => { if (k && parts[i]) cell[k] = parts[i]; });
         const { grades, group, title, teacher, category, capacity, pay_rate: payRate, textbook, description } = cell;
@@ -206,8 +209,9 @@ export default function AdminCourses() {
     return { rows, errors };
   }, [bulkText, groups]);
 
-  // 일괄 등록 양식(엑셀) 다운로드 — 1행 제목·머리글 서식·테두리 포함, 열 너비는 내용에 맞게 자동 조절,
-  // 교과군·교과는 드롭다운(데이터 유효성 검사)으로만 입력할 수 있다.
+  // 일괄 등록 양식(엑셀) 다운로드 — 1·2학년/3학년 두 시트, 1행 제목·머리글 서식·테두리 포함,
+  // 열 너비는 내용에 맞게 자동 조절, 교과군·교과는 드롭다운(데이터 유효성 검사)으로만 입력할 수 있다.
+  // 유효성 검사는 저장 시 범위형(sqref)으로 병합되는 표준 구조라 구글시트 가져오기에서도 유지된다.
   async function downloadBulkTemplate() {
     const ExcelJS = await import('exceljs'); // 양식 다운로드 시에만 로드 (번들 분리)
     // 예시·드롭다운의 교과군은 현재 세션에 등록된 이름 그대로 사용
@@ -215,80 +219,98 @@ export default function AdminCourses() {
     const g1 = groupNames[0];
     const g2 = groupNames[1] ?? groupNames[0];
     const HEADER = ['학년', '교과군', '강좌명', '강사', '교과', '정원', '부교재', '강좌소개'];
-    const DATA: (string | number)[][] = [
-      [
-        1, g1, '수능 국어 문학 개념 완성', '김국어', '국어', 20, 'EBS 수능특강 문학',
-        '현대시·고전시가 핵심 개념을 작품과 함께 정리하고 기출 문제로 적용 훈련을 합니다.',
-      ],
-      [
-        2, g2, '수학Ⅱ 내신·수능 집중 문제풀이', '이수학', '수학', 20, '쎈 수학Ⅱ',
-        '함수의 극한부터 적분까지 유형별로 정리하고 내신·수능 기출을 집중 풀이합니다.',
-      ],
-      [
-        3, g1, '수능 영어 듣기·독해 실전 연습', '박영어', '영어', 20, '자체제작',
-        '듣기 유형별 전략과 빈칸·순서 등 고난도 독해를 실전 모의고사 형식으로 연습합니다.',
-      ],
-      [
-        12, g2, '입시 체육 실기 훈련', '최체육', '기타', 10, '자체제작',
-        '체대 입시 실기 종목을 기초 체력부터 단계별로 훈련하고 개인별 기록을 관리합니다.',
-      ],
+    const SHEETS: { name: string; title: string; data: (string | number)[][] }[] = [
+      {
+        name: '1·2학년',
+        title: '강좌 일괄등록 양식 — 1·2학년',
+        data: [
+          [
+            1, g1, '수능 국어 문학 개념 완성', '김국어', '국어', 20, 'EBS 수능특강 문학',
+            '현대시·고전시가 핵심 개념을 작품과 함께 정리하고 기출 문제로 적용 훈련을 합니다.',
+          ],
+          [
+            2, g2, '수학Ⅱ 내신·수능 집중 문제풀이', '이수학', '수학', 20, '쎈 수학Ⅱ',
+            '함수의 극한부터 적분까지 유형별로 정리하고 내신·수능 기출을 집중 풀이합니다.',
+          ],
+          [
+            12, g2, '입시 체육 실기 훈련', '최체육', '기타', 10, '자체제작',
+            '체대 입시 실기 종목을 기초 체력부터 단계별로 훈련하고 개인별 기록을 관리합니다.',
+          ],
+        ],
+      },
+      {
+        name: '3학년',
+        title: '강좌 일괄등록 양식 — 3학년',
+        data: [
+          [
+            3, g1, '수능 영어 듣기·독해 실전 연습', '박영어', '영어', 20, '자체제작',
+            '듣기 유형별 전략과 빈칸·순서 등 고난도 독해를 실전 모의고사 형식으로 연습합니다.',
+          ],
+          [
+            3, g2, '사회·문화 수능 개념 완성', '정사회', '사회', 20, 'EBS 수능특강 사회·문화',
+            '사회·문화 핵심 개념을 정리하고 도표 분석 등 고난도 기출 유형을 집중 대비합니다.',
+          ],
+        ],
+      },
     ];
     const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet('강좌 일괄등록');
-    ws.addRow(['강좌 일괄등록 양식']); // 1행: 제목
-    ws.addRow(HEADER);                 // 2행: 머리글
-    DATA.forEach((r) => ws.addRow(r)); // 3행~: 예시
-    // 제목 서식 — 전체 열 병합 + 진한 배경
-    ws.mergeCells(1, 1, 1, HEADER.length);
-    const title = ws.getCell('A1');
-    title.value = '강좌 일괄등록 양식';
-    title.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
-    title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
-    title.alignment = { horizontal: 'center', vertical: 'middle' };
-    ws.getRow(1).height = 30;
-    // 머리글·예시 서식 — 옅은 배경, 테두리, 가운데 정렬(짧은 열)
     const thin = { style: 'thin' as const, color: { argb: 'FFCBD5E1' } };
     const border = { top: thin, bottom: thin, left: thin, right: thin };
-    const headerRow = ws.getRow(2);
-    headerRow.height = 22;
-    HEADER.forEach((_, c) => {
-      const cell = headerRow.getCell(c + 1);
-      cell.font = { bold: true };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = border;
-    });
-    const centered = [1, 2, 5, 6]; // 학년·교과군·교과·정원은 가운데 정렬
-    DATA.forEach((_, r) => {
-      const row = ws.getRow(r + 3);
-      row.height = 20;
-      HEADER.forEach((__, c) => {
-        const cell = row.getCell(c + 1);
-        cell.border = border;
-        cell.alignment = { horizontal: centered.includes(c + 1) ? 'center' : 'left', vertical: 'middle' };
-      });
-    });
-    ws.views = [{ state: 'frozen', ySplit: 2 }]; // 제목·머리글 고정
-    // 열 너비 = 머리글·예시에서 가장 긴 내용 기준 (한글은 2칸으로 계산)
     const width = (v: string | number) => [...String(v)].reduce((a, ch) => a + (ch.charCodeAt(0) > 127 ? 2 : 1), 0);
-    HEADER.forEach((_, c) => {
-      ws.getColumn(c + 1).width = Math.max(width(HEADER[c]), ...DATA.map((r) => width(r[c] ?? ''))) + 2;
-    });
-    // 드롭다운 목록은 숨김 시트에 두고 참조 — 교과군(B)·교과(E)는 목록에 있는 값만 입력 가능
+    for (const def of SHEETS) {
+      const ws = wb.addWorksheet(def.name);
+      ws.addRow([def.title]);                 // 1행: 제목
+      ws.addRow(HEADER);                      // 2행: 머리글
+      def.data.forEach((r) => ws.addRow(r)); // 3행~: 예시
+      // 제목 서식 — 전체 열 병합 + 진한 배경
+      ws.mergeCells(1, 1, 1, HEADER.length);
+      const title = ws.getCell('A1');
+      title.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+      title.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+      title.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 30;
+      // 머리글·예시 서식 — 옅은 배경, 테두리, 가운데 정렬(짧은 열)
+      const headerRow = ws.getRow(2);
+      headerRow.height = 22;
+      HEADER.forEach((_, c) => {
+        const cell = headerRow.getCell(c + 1);
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = border;
+      });
+      const centered = [1, 2, 5, 6]; // 학년·교과군·교과·정원은 가운데 정렬
+      def.data.forEach((_, r) => {
+        const row = ws.getRow(r + 3);
+        row.height = 20;
+        HEADER.forEach((__, c) => {
+          const cell = row.getCell(c + 1);
+          cell.border = border;
+          cell.alignment = { horizontal: centered.includes(c + 1) ? 'center' : 'left', vertical: 'middle' };
+        });
+      });
+      ws.views = [{ state: 'frozen', ySplit: 2 }]; // 제목·머리글 고정
+      // 열 너비 = 머리글·예시에서 가장 긴 내용 기준 (한글은 2칸으로 계산)
+      HEADER.forEach((_, c) => {
+        ws.getColumn(c + 1).width = Math.max(width(HEADER[c]), ...SHEETS.flatMap((s) => s.data).map((r) => width(r[c] ?? ''))) + 2;
+      });
+      // 드롭다운 — 교과군(B)·교과(E)는 숨김 목록 시트에 있는 값만 입력 가능 (201행까지).
+      // 셀별 지정 대신 범위형(sqref) 하나로 기록 — 구글시트 가져오기에서도 그대로 연동되는 표준 구조.
+      // (dataValidations는 타입 정의에 없지만 ExcelJS 공개 모델의 일부)
+      const dv = (ws as unknown as { dataValidations: { add: (range: string, v: object) => void } }).dataValidations;
+      dv.add('B3:B201', {
+        type: 'list', allowBlank: true, formulae: [`목록!$A$1:$A$${groupNames.length}`],
+        showErrorMessage: true, errorStyle: 'stop', errorTitle: '교과군', error: '드롭다운 목록에서 선택하세요.',
+      });
+      dv.add('E3:E201', {
+        type: 'list', allowBlank: true, formulae: [`목록!$B$1:$B$${CATEGORIES.length}`],
+        showErrorMessage: true, errorStyle: 'stop', errorTitle: '교과', error: '드롭다운 목록에서 선택하세요.',
+      });
+    }
     const list = wb.addWorksheet('목록');
     groupNames.forEach((n, i) => { list.getCell(i + 1, 1).value = n; });
     CATEGORIES.forEach((n, i) => { list.getCell(i + 1, 2).value = n; });
     list.state = 'veryHidden';
-    for (let r = 3; r <= 201; r++) {
-      ws.getCell(`B${r}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [`목록!$A$1:$A$${groupNames.length}`],
-        showErrorMessage: true, errorStyle: 'stop', errorTitle: '교과군', error: '드롭다운 목록에서 선택하세요.',
-      };
-      ws.getCell(`E${r}`).dataValidation = {
-        type: 'list', allowBlank: true, formulae: [`목록!$B$1:$B$${CATEGORIES.length}`],
-        showErrorMessage: true, errorStyle: 'stop', errorTitle: '교과', error: '드롭다운 목록에서 선택하세요.',
-      };
-    }
     const buf = await wb.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a');
@@ -829,7 +851,7 @@ export default function AdminCourses() {
               쉼표 또는 탭(엑셀 붙여넣기) 구분이며, 생략할 항목은 <b>-</b>로 채웁니다.
               <br />학년은 <b>12</b>(1·2학년)처럼 붙여 쓰고 <b>-</b>는 전학년, 교과군은 교과군 관리에 등록된 <b>이름 그대로</b>,
               강사는 <b>아이디 또는 이름</b>으로 적습니다. 계획 차시는 세션 기본값이 자동 적용됩니다.
-              <br />아래 <b>양식</b>을 내려받아 엑셀에서 작성한 뒤 그대로 붙여넣어도 됩니다 — 제목 줄을 자동 인식하며, 교과군·교과는 <b>드롭다운</b>에서 선택합니다.
+              <br />아래 <b>양식</b>(1·2학년/3학년 시트)을 내려받아 작성한 뒤 시트 내용을 그대로 붙여넣으면 됩니다 — 제목·머리글 줄은 자동 인식하며, 교과군·교과는 <b>드롭다운</b>에서 선택합니다.
               <div className="mt-1 font-mono text-xs text-slate-500">
                 1, A유형, 수능 국어 문학 개념 완성, 김국어, 국어, 25<br />
                 -, B유형, 수학Ⅱ 집중 문제풀이, -, 수학, 20 <span className="text-slate-400">← 전학년 · 강사 미배정</span>
